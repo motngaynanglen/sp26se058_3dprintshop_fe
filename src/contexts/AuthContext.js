@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
+import { loginApi, registerApi } from '../api/authApi';
 
 const AuthContext = createContext();
 
@@ -23,102 +24,86 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
-  const login = async (emailOrPhone, password) => {
-    // Test accounts for different roles
-    const testAccounts = {
-      'customer@test.com': { password: 'customer123', role: 'customer', name: 'John Customer', id: '1' },
-      'employee@test.com': { password: 'employee123', role: 'employee', name: 'Jane Employee', id: '2' },
-      'admin@test.com': { password: 'admin123', role: 'admin', name: 'Admin User', id: '3' },
-      // Phone number alternatives
-      '0123456789': { password: 'customer123', role: 'customer', name: 'John Customer', id: '1' },
-      '0987654321': { password: 'employee123', role: 'employee', name: 'Jane Employee', id: '2' },
-      '0111222333': { password: 'admin123', role: 'admin', name: 'Admin User', id: '3' }
-    };
+  // Đăng nhập bằng API backend
+  const login = async (username, password) => {
+    try {
+      const res = await loginApi({ username, password });
 
-    const account = testAccounts[emailOrPhone.toLowerCase()];
-    
-    if (!account) {
-      return { success: false, message: 'Invalid email or phone number' };
+      if (res?.statusCode !== 200 || res?.code !== 'SUCCESS') {
+        return { success: false, message: res?.message || 'Đăng nhập thất bại' };
+      }
+
+      const data = res.data;
+
+      const userFromApi = {
+        id: data.accountId,
+        username: data.userName,
+        fullName: data.fullName,
+        image: data.image,
+        role: data.role, // ví dụ: "Customer", "Admin", "Staff"
+      };
+
+      // Lưu token để interceptor tự gắn Authorization
+      if (data.token) {
+        localStorage.setItem('token', data.token);
+      }
+
+      setUser(userFromApi);
+      localStorage.setItem('user', JSON.stringify(userFromApi));
+
+      return { success: true, user: userFromApi };
+    } catch (error) {
+      const message =
+        error.response?.data?.message || 'Đăng nhập thất bại. Vui lòng thử lại.';
+      return { success: false, message };
     }
-
-    if (account.password !== password) {
-      return { success: false, message: 'Invalid password' };
-    }
-
-    const user = {
-      id: account.id,
-      email: emailOrPhone.includes('@') ? emailOrPhone : undefined,
-      phone: !emailOrPhone.includes('@') ? emailOrPhone : undefined,
-      role: account.role,
-      name: account.name
-    };
-
-    setUser(user);
-    localStorage.setItem('user', JSON.stringify(user));
-    return { success: true, user };
   };
 
-  const loginWithOTP = async (phoneNumber) => {
-    // Test accounts for OTP login (using phone numbers)
-    const testAccounts = {
-      '0123456789': { role: 'customer', name: 'John Customer', id: '1' },
-      '0987654321': { role: 'employee', name: 'Jane Employee', id: '2' },
-      '0111222333': { role: 'admin', name: 'Admin User', id: '3' }
-    };
+  // Đăng ký bằng API backend
+  const register = async ({ username, password, fullName, email, phoneNumber }) => {
+    try {
+      const res = await registerApi({ username, password, fullName, email, phoneNumber });
 
-    const account = testAccounts[phoneNumber];
-    
-    if (!account) {
-      return { success: false, message: 'Invalid phone number' };
+      if (res?.statusCode !== 200 || res?.code !== 'SUCCESS' || !res?.data) {
+        return { success: false, message: res?.message || 'Đăng ký thất bại' };
+      }
+
+      // Backend chỉ trả về data: true, nên sau khi đăng ký có thể:
+      // - tự động đăng nhập (gọi lại login)
+      // - hoặc redirect user tới trang login
+      // Ở đây: chỉ báo success, không set user.
+      return { success: true };
+    } catch (error) {
+      const message =
+        error.response?.data?.message || 'Đăng ký thất bại. Vui lòng thử lại.';
+      return { success: false, message };
     }
-
-    // For OTP, we'll just accept any OTP code for testing
-    const user = {
-      id: account.id,
-      phone: phoneNumber,
-      role: account.role,
-      name: account.name
-    };
-
-    setUser(user);
-    localStorage.setItem('user', JSON.stringify(user));
-    return { success: true, user };
-  };
-
-  const register = async (userData) => {
-    // TODO: Replace with actual API call
-    const mockUser = {
-      id: '1',
-      ...userData,
-      role: 'customer'
-    };
-    setUser(mockUser);
-    localStorage.setItem('user', JSON.stringify(mockUser));
-    return { success: true, user: mockUser };
   };
 
   const logout = () => {
     setUser(null);
     localStorage.removeItem('user');
+    localStorage.removeItem('token');
   };
 
-  const forgotPassword = async (emailOrPhone) => {
-    // TODO: Replace with actual API call
+  // Placeholder, sẽ gắn API thật khi backend có
+  const forgotPassword = async () => {
     return { success: true, message: 'Password reset link sent' };
   };
+
+  const normalizedRole = user?.role?.toLowerCase();
 
   const value = {
     user,
     login,
-    loginWithOTP,
     register,
     logout,
     forgotPassword,
     loading,
     isAuthenticated: !!user,
-    isCustomer: user?.role === 'customer',
-    isEmployee: user?.role === 'employee',
-    isAdmin: user?.role === 'admin'
+    isCustomer: normalizedRole === 'customer',
+    isEmployee: normalizedRole === 'employee' || normalizedRole === 'staff',
+    isAdmin: normalizedRole === 'admin',
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
