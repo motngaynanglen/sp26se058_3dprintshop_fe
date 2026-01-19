@@ -1,11 +1,11 @@
-name: Deploy to Vietnix (Production)
+name: Deploy Frontend to Vietnix (Port 5000)
 
 on:
   push:
     branches: [ "main" ]
 
 jobs:
-  vietnix-deployment:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -20,15 +20,38 @@ jobs:
       - name: Install & Build
         run: |
           npm install
-          npm run build
+          npm run build # Tạo ra thư mục dist
 
-      - name: Deploy via SSH
+      - name: Copy files to Vietnix via SCP
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT }}
-          source: "dist/*"
-          target: "/var/www/3dprintshop"
-          strip_components: 1
+          # Gửi cả folder dist và file Dockerfile sang server
+          source: "dist/*,Dockerfile"
+          target: "~/3dprint-fe"
+
+      - name: Build and Run Docker on Vietnix
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            cd ~/3dprint-fe
+            
+            # Xây dựng Docker Image từ code mới
+            docker build -t 3dprint-frontend .
+            
+            # Dừng và xóa container cũ nếu đang chạy
+            docker stop 3dprint-frontend || true
+            docker rm 3dprint-frontend || true
+            
+            # Chạy container mới trên cổng 5000
+            docker run -d --name 3dprint-frontend -p 5000:80 3dprint-frontend
+            
+            # Dọn dẹp các Image thừa để tiết kiệm dung lượng ổ cứng Vietnix
+            docker image prune -f
