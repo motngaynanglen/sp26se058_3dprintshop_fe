@@ -22,9 +22,9 @@ export default defineConfig({
     },
   },
   server: {
+    host: '127.0.0.2',
     port: 5000,
-    fs: {
-      strict: false // Cho phép Vite truy cập file thoải mái hơn
-    }
+    strictPort: true,
+    cors: true // Thêm cors để tránh việc bị chặn khi gọi API từ IP khác
   }
 })
