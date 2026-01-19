@@ -25,6 +25,9 @@ export default defineConfig({
     host: '127.0.0.2',
     port: 5000,
     strictPort: true,
-    cors: true // Thêm cors để tránh việc bị chặn khi gọi API từ IP khác
+    cors: true, // Thêm cors để tránh việc bị chặn khi gọi API từ IP khác
+    fs: {
+      strict: false // Cho phép truy cập file linh hoạt hơn
+    }
   }
 })
