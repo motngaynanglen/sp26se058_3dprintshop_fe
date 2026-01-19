@@ -3,7 +3,8 @@ import axios from "axios";
 // TODO: chỉnh lại baseURL cho đúng với backend của bạn
 // Ví dụ: http://localhost:8080 hoặc https://your-domain.com
 export const axiosInstance = axios.create({
-  baseURL: "https://localhost:5001", // <=== nhớ chỉnh lại cho đúng môi trường của bạn
+  //baseURL: "https://localhost:5001", // <=== nhớ chỉnh lại cho đúng môi trường của bạn
+  baseURL: "/api", // Nhớ dùng file .env! 
   headers: {
     "Content-Type": "application/json",
   },
