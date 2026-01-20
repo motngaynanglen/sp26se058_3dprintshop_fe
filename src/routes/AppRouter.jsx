@@ -1,46 +1,50 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Layout from '../components/Layout/Layout';
-import PrivateRoute from './PrivateRoute';
-import PublicRoute from './PublicRoute';
+import React from "react";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import Layout from "../components/Layout/Layout";
+import PrivateRoute from "./PrivateRoute";
+import PublicRoute from "./PublicRoute";
 
 // General Pages
-import Home from '../pages/Home';
-import Login from '../pages/Login';
-import Register from '../pages/Register';
-import ForgotPassword from '../pages/ForgotPassword';
-import ProductCatalog from '../pages/ProductCatalog';
-import ProductDetail from '../pages/ProductDetail';
-import ShoppingCart from '../pages/ShoppingCart';
-import Checkout from '../pages/Checkout';
-import OrderConfirmation from '../pages/OrderConfirmation';
-import MyOrders from '../pages/MyOrders';
-import OrderDetail from '../pages/OrderDetail';
+import Home from "../pages/Home";
+import Login from "../pages/Login";
+import Register from "../pages/Register";
+import ForgotPassword from "../pages/ForgotPassword";
+import ProductCatalog from "../pages/ProductCatalog";
+import ProductDetail from "../pages/ProductDetail";
+import ShoppingCart from "../pages/ShoppingCart";
+import Checkout from "../pages/Checkout";
+import OrderConfirmation from "../pages/OrderConfirmation";
+import MyOrders from "../pages/MyOrders";
+import OrderDetail from "../pages/OrderDetail";
 
 // Customer Pages
-import CustomOrderType from '../pages/CustomOrderType';
-import CustomOrderUpload from '../pages/CustomOrderUpload';
-import CustomOrderRequestDesign from '../pages/CustomOrderRequestDesign';
-import CustomOrderAIGenerate from '../pages/CustomOrderAIGenerate';
-import MyCustomOrders from '../pages/MyCustomOrders';
-import CustomOrderDetail from '../pages/CustomOrderDetail';
-import Preview3D from '../pages/Preview3D';
-import FeedbackForm from '../pages/FeedbackForm';
+import CustomOrderType from "../pages/CustomOrderType";
+import CustomOrderUpload from "../pages/CustomOrderUpload";
+import CustomOrderRequestDesign from "../pages/CustomOrderRequestDesign";
+import CustomOrderAIGenerate from "../pages/CustomOrderAIGenerate";
+import MyCustomOrders from "../pages/MyCustomOrders";
+import CustomOrderDetail from "../pages/CustomOrderDetail";
+import Preview3D from "../pages/Preview3D";
+import FeedbackForm from "../pages/FeedbackForm";
 
 // Staff Pages
-import StaffDashboard from '../pages/Staff/StaffDashboard';
-import StaffCustomOrdersList from '../pages/Staff/StaffCustomOrdersList';
-import StaffCustomOrderDetail from '../pages/Staff/StaffCustomOrderDetail';
-import DesignFileUpload from '../pages/Staff/DesignFileUpload';
+import StaffDashboard from "../pages/Staff/StaffDashboard";
+import StaffCustomOrdersList from "../pages/Staff/StaffCustomOrdersList";
+import StaffCustomOrderDetail from "../pages/Staff/StaffCustomOrderDetail";
+import DesignFileUpload from "../pages/Staff/DesignFileUpload";
 
 // Admin Pages
-import AdminDashboard from '../pages/Admin/AdminDashboard';
-import ManageProducts from '../pages/Admin/ManageProducts';
-import ManageMaterials from '../pages/Admin/ManageMaterials';
-import ManageStaffAccounts from '../pages/Admin/ManageStaffAccounts';
-import ManageUsers from '../pages/Admin/ManageUsers';
-import FeedbackList from '../pages/Admin/FeedbackList';
-import SystemSettings from '../pages/Admin/SystemSettings';
+import AdminDashboard from "../pages/Admin/AdminDashboard";
+import ManageProducts from "../pages/Admin/ManageProducts";
+import ManageMaterials from "../pages/Admin/ManageMaterials";
+import ManageStaffAccounts from "../pages/Admin/ManageStaffAccounts";
+import ManageUsers from "../pages/Admin/ManageUsers";
+import FeedbackList from "../pages/Admin/FeedbackList";
+import SystemSettings from "../pages/Admin/SystemSettings";
+import StaffDesignReviewDetail from "../pages/Staff/StaffDesignReviewDetail";
+import StaffDesignReviewsList from "../pages/Staff/StaffDesignReviewsList";
+import StaffCustomOrderManagementDetail from "../pages/Staff/StaffCustomOrderManagementDetail";
+import StaffCustomOrdersManagement from "../pages/Staff/StaffCustomOrdersManagement";
 
 const AppRouter = () => {
   return (
@@ -207,6 +211,42 @@ const AppRouter = () => {
             }
           />
           <Route
+            path="/staff/custom-orders-management"
+            element={
+              <PrivateRoute requiredRole="employee">
+                <StaffCustomOrdersManagement />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/staff/custom-orders-management/:id"
+            element={
+              <PrivateRoute requiredRole="employee">
+                <StaffCustomOrderManagementDetail />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/staff/design-reviews"
+            element={
+              <PrivateRoute requiredRole="employee">
+                <StaffDesignReviewsList />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/staff/design-reviews/:id"
+            element={
+              <PrivateRoute requiredRole="employee">
+                <StaffDesignReviewDetail />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
             path="/staff/custom-orders/:id"
             element={
               <PrivateRoute requiredRole="employee">
@@ -287,5 +327,3 @@ const AppRouter = () => {
 };
 
 export default AppRouter;
-
-
