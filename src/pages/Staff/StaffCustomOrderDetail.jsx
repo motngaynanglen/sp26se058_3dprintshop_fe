@@ -1,87 +1,183 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { staffCustomOrders as mockData } from '../../mock/staffCustomOrders';
+import React, { useState } from "react";
+import { useParams } from "react-router-dom";
 
-const StaffCustomOrdersList = () => {
-  const [orders, setOrders] = useState([]);
-  const [statusFilter, setStatusFilter] = useState('all');
-  const navigate = useNavigate();
+/**
+ * MOCK DATA
+ */
+const mockOrder = {
+  id: "123",
+  customerName: "Nguyễn Văn A",
+  productType: "Custom 3D Figure",
+  material: "Resin",
+  size: "15cm",
+  status: "Waiting for design",
+  createdAt: "2026-01-10",
+  description: "Mô hình nhân vật theo ảnh đính kèm",
+  referenceImages: [
+    "https://via.placeholder.com/150",
+    "https://via.placeholder.com/150",
+  ],
+};
 
-  useEffect(() => {
-    setTimeout(() => {
-      setOrders(mockData);
-    }, 300);
-  }, []);
+const mockMessages = [
+  { id: 1, sender: "customer", content: "Mình muốn nhân vật cười nhẹ hơn." },
+  { id: 2, sender: "staff", content: "Ok mình sẽ chỉnh lại cho bạn nhé!" },
+];
 
-  const filteredOrders =
-    statusFilter === 'all'
-      ? orders
-      : orders.filter(o => o.status === statusFilter);
+const StaffCustomOrderDetail = () => {
+  const { id } = useParams();
+
+  const [order, setOrder] = useState(mockOrder);
+  const [messages, setMessages] = useState(mockMessages);
+  const [newMessage, setNewMessage] = useState("");
+  const [previewFile, setPreviewFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+
+  const handleSendMessage = () => {
+    if (!newMessage.trim()) return;
+    setMessages([
+      ...messages,
+      { id: Date.now(), sender: "staff", content: newMessage },
+    ]);
+    setNewMessage("");
+  };
+
+  const handleUploadPreview = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setPreviewFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const handleApprove = () => {
+    setOrder({ ...order, status: "Design approved" });
+    alert("✅ Đã duyệt thiết kế!");
+  };
+
+  const handleReject = () => {
+    setOrder({ ...order, status: "Need revision" });
+    alert("❌ Yêu cầu chỉnh sửa thiết kế!");
+  };
 
   return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-semibold">Custom Orders Management</h1>
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
+      <h1 className="text-2xl font-bold">Custom Order #{id}</h1>
 
-      <div className="flex gap-4">
-        <select
-          value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value)}
-          className="border rounded px-3 py-2"
-        >
-          <option value="all">All</option>
-          <option value="pending">Pending</option>
-          <option value="confirmed">Confirmed</option>
-          <option value="printing">Printing</option>
-          <option value="completed">Completed</option>
-          <option value="cancelled">Cancelled</option>
-        </select>
+      {/* ORDER INFO */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white rounded-xl shadow p-4">
+        <div>
+          <p>
+            <b>Khách hàng:</b> {order.customerName}
+          </p>
+          <p>
+            <b>Sản phẩm:</b> {order.productType}
+          </p>
+          <p>
+            <b>Chất liệu:</b> {order.material}
+          </p>
+          <p>
+            <b>Kích thước:</b> {order.size}
+          </p>
+        </div>
+        <div>
+          <p>
+            <b>Trạng thái:</b>
+            <span className="ml-2 px-3 py-1 rounded bg-yellow-100 text-yellow-800 text-sm">
+              {order.status}
+            </span>
+          </p>
+          <p>
+            <b>Ngày tạo:</b> {order.createdAt}
+          </p>
+        </div>
       </div>
 
-      <div className="overflow-x-auto border rounded">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-100 text-left">
-            <tr>
-              <th className="p-3">Order ID</th>
-              <th className="p-3">Customer</th>
-              <th className="p-3">Product</th>
-              <th className="p-3">Qty</th>
-              <th className="p-3">Total</th>
-              <th className="p-3">Status</th>
-              <th className="p-3">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredOrders.map(order => (
-              <tr key={order.id} className="border-t hover:bg-gray-50">
-                <td className="p-3">{order.id}</td>
-                <td className="p-3">{order.customerName}</td>
-                <td className="p-3">{order.productName}</td>
-                <td className="p-3">{order.quantity}</td>
-                <td className="p-3">{order.totalPrice.toLocaleString()} đ</td>
-                <td className="p-3 capitalize">{order.status}</td>
-                <td className="p-3">
-                  <button
-                    onClick={() => navigate(`/staff/custom-orders/${order.id}`)}
-                    className="text-blue-600 hover:underline"
-                  >
-                    View
-                  </button>
-                </td>
-              </tr>
-            ))}
+      {/* DESCRIPTION + REFERENCES */}
+      <div className="bg-white rounded-xl shadow p-4">
+        <h2 className="font-semibold mb-2">Yêu cầu khách hàng</h2>
+        <p className="mb-3">{order.description}</p>
 
-            {filteredOrders.length === 0 && (
-              <tr>
-                <td colSpan="7" className="p-6 text-center text-gray-500">
-                  No custom orders found
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+        <div className="flex gap-3">
+          {order.referenceImages.map((img, index) => (
+            <img
+              key={index}
+              src={img}
+              alt="reference"
+              className="w-24 h-24 object-cover rounded border"
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* UPLOAD DESIGN PREVIEW */}
+      <div className="bg-white rounded-xl shadow p-4 space-y-3">
+        <h2 className="font-semibold">Upload file preview thiết kế</h2>
+        <input type="file" onChange={handleUploadPreview} />
+
+        {previewUrl && (
+          <div className="mt-3">
+            <p className="text-sm text-gray-600 mb-1">Preview:</p>
+            <img
+              src={previewUrl}
+              alt="preview"
+              className="w-48 rounded border"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* ACTION BUTTONS */}
+      <div className="flex gap-3">
+        <button
+          onClick={handleApprove}
+          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+        >
+          Duyệt thiết kế
+        </button>
+        <button
+          onClick={handleReject}
+          className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+        >
+          Yêu cầu chỉnh sửa
+        </button>
+      </div>
+
+      {/* CHAT / FEEDBACK */}
+      <div className="bg-white rounded-xl shadow p-4 flex flex-col h-[350px]">
+        <h2 className="font-semibold mb-2">Trao đổi với khách hàng</h2>
+
+        <div className="flex-1 overflow-y-auto space-y-2 mb-3">
+          {messages.map((msg) => (
+            <div
+              key={msg.id}
+              className={`max-w-xs px-3 py-2 rounded-lg text-sm ${
+                msg.sender === "staff"
+                  ? "ml-auto bg-blue-600 text-white"
+                  : "mr-auto bg-gray-200 text-gray-800"
+              }`}
+            >
+              {msg.content}
+            </div>
+          ))}
+        </div>
+
+        <div className="flex gap-2">
+          <input
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            placeholder="Nhập phản hồi..."
+            className="flex-1 border rounded px-3 py-2"
+          />
+          <button
+            onClick={handleSendMessage}
+            className="bg-blue-600 text-white px-4 rounded"
+          >
+            Gửi
+          </button>
+        </div>
       </div>
     </div>
   );
 };
 
-export default StaffCustomOrdersList;
+export default StaffCustomOrderDetail;
