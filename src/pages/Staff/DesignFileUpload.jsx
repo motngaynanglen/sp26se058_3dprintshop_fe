@@ -29,11 +29,12 @@ const DesignFileUpload = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-8 py-8">
-      <h1 className="text-3xl font-bold mb-8 text-gray-800">Upload Design File</h1>
-      <p className="text-gray-600 mb-8">Order #{orderId}</p>
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-3xl font-bold mb-6 text-gray-800">Tải lên file thiết kế</h1>
+        <p className="text-gray-600 mb-6">Đơn hàng #{orderId}</p>
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-md p-8">
+        <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-md p-8">
         <div className="mb-6">
           <label className="block mb-2 font-medium text-gray-800">3D Design File</label>
           <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-indigo-600 transition-colors">
@@ -119,7 +120,8 @@ const DesignFileUpload = () => {
             Cancel
           </button>
         </div>
-      </form>
+        </form>
+      </div>
     </div>
   );
 };

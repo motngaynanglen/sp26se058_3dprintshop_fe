@@ -22,9 +22,10 @@ const StaffCustomOrdersList = () => {
   });
 
   return (
-    <div className="max-w-7xl mx-auto px-8 py-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">Custom Orders</h1>
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-gray-800">Đơn hàng tùy chỉnh</h1>
         <Link
           to="/staff/dashboard"
           className="text-indigo-600 hover:text-indigo-800 font-medium"
@@ -100,6 +101,7 @@ const StaffCustomOrdersList = () => {
             ))}
           </tbody>
         </table>
+      </div>
       </div>
     </div>
   );

@@ -13,9 +13,10 @@ const ManageUsers = () => {
     : users.filter(user => user.role === filter);
 
   return (
-    <div className="max-w-7xl mx-auto px-8 py-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">Manage Users</h1>
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-gray-800">Quản lý người dùng</h1>
         <div className="flex gap-2">
           <button
             onClick={() => setFilter('all')}
@@ -23,7 +24,7 @@ const ManageUsers = () => {
               filter === 'all' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
             }`}
           >
-            All
+            Tất cả
           </button>
           <button
             onClick={() => setFilter('customer')}
@@ -31,7 +32,7 @@ const ManageUsers = () => {
               filter === 'customer' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
             }`}
           >
-            Customers
+            Khách hàng
           </button>
           <button
             onClick={() => setFilter('employee')}
@@ -39,7 +40,7 @@ const ManageUsers = () => {
               filter === 'employee' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
             }`}
           >
-            Employees
+            Nhân viên
           </button>
           <button
             onClick={() => setFilter('admin')}
@@ -47,7 +48,7 @@ const ManageUsers = () => {
               filter === 'admin' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
             }`}
           >
-            Admins
+            Quản trị viên
           </button>
         </div>
       </div>
@@ -56,10 +57,10 @@ const ManageUsers = () => {
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Name</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Tên</th>
               <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Email</th>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Role</th>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Registered</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Vai trò</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Ngày đăng ký</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -77,6 +78,7 @@ const ManageUsers = () => {
             ))}
           </tbody>
         </table>
+      </div>
       </div>
     </div>
   );

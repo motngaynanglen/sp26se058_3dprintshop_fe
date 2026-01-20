@@ -15,20 +15,21 @@ const ManageMaterials = () => {
   };
 
   const handleDelete = (id) => {
-    if (window.confirm('Are you sure you want to delete this material?')) {
+    if (window.confirm('Bạn có chắc chắn muốn xóa vật liệu này?')) {
       setMaterials(materials.filter(m => m.id !== id));
     }
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-8 py-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">Manage Materials</h1>
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-gray-800">Quản lý vật liệu in</h1>
         <button
           onClick={() => { setEditingMaterial(null); setShowModal(true); }}
           className="py-2 px-6 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
         >
-          + Add Material
+          + Thêm vật liệu
         </button>
       </div>
 
@@ -36,10 +37,10 @@ const ManageMaterials = () => {
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Name</th>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Price per Gram</th>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Availability</th>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Actions</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Tên vật liệu</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Giá mỗi gram</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Trạng thái</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -51,7 +52,7 @@ const ManageMaterials = () => {
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                     material.available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                   }`}>
-                    {material.available ? 'Available' : 'Unavailable'}
+                    {material.available ? 'Có sẵn' : 'Không có sẵn'}
                   </span>
                 </td>
                 <td className="px-6 py-4">
@@ -60,19 +61,19 @@ const ManageMaterials = () => {
                       onClick={() => { setEditingMaterial(material); setShowModal(true); }}
                       className="text-indigo-600 hover:text-indigo-800 font-medium"
                     >
-                      Edit
+                      Sửa
                     </button>
                     <button
                       onClick={() => handleToggle(material.id)}
                       className="text-yellow-600 hover:text-yellow-800 font-medium"
                     >
-                      {material.available ? 'Disable' : 'Enable'}
+                      {material.available ? 'Tắt' : 'Bật'}
                     </button>
                     <button
                       onClick={() => handleDelete(material.id)}
                       className="text-red-600 hover:text-red-800 font-medium"
                     >
-                      Delete
+                      Xóa
                     </button>
                   </div>
                 </td>
@@ -80,6 +81,7 @@ const ManageMaterials = () => {
             ))}
           </tbody>
         </table>
+      </div>
       </div>
     </div>
   );

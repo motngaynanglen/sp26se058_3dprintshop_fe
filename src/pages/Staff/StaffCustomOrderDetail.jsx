@@ -34,10 +34,11 @@ const StaffCustomOrderDetail = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-8 py-8">
-      <div className="mb-6">
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-4">
         <Link to="/staff/custom-orders" className="text-indigo-600 hover:text-indigo-800 font-medium">
-          ← Back to Orders
+          ← Quay lại danh sách đơn hàng
         </Link>
       </div>
 
@@ -135,6 +136,7 @@ const StaffCustomOrderDetail = () => {
             Mark as Completed
           </button>
         </div>
+      </div>
       </div>
     </div>
   );

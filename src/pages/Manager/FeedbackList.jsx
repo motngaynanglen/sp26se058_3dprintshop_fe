@@ -16,12 +16,13 @@ const FeedbackList = () => {
   });
 
   return (
-    <div className="max-w-7xl mx-auto px-8 py-8">
-      <h1 className="text-3xl font-bold mb-8 text-gray-800">Customer Feedback</h1>
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-7xl mx-auto">
+        <h1 className="text-3xl font-bold mb-6 text-gray-800">Phản hồi khách hàng</h1>
 
       <div className="mb-6 flex gap-4 flex-wrap">
         <div className="flex gap-2">
-          <span className="py-2 px-4 font-medium text-gray-700">Rating:</span>
+          <span className="py-2 px-4 font-medium text-gray-700">Đánh giá:</span>
           {['all', '5', '4', '3', '2', '1'].map(rating => (
             <button
               key={rating}
@@ -30,7 +31,7 @@ const FeedbackList = () => {
                 ratingFilter === rating ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
               }`}
             >
-              {rating === 'all' ? 'All' : `${rating} ⭐`}
+              {rating === 'all' ? 'Tất cả' : `${rating} ⭐`}
             </button>
           ))}
         </div>
@@ -40,11 +41,11 @@ const FeedbackList = () => {
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Order ID</th>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Customer</th>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Rating</th>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Comment</th>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Date</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Mã đơn hàng</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Khách hàng</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Đánh giá</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Nhận xét</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Ngày</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -67,6 +68,7 @@ const FeedbackList = () => {
             ))}
           </tbody>
         </table>
+      </div>
       </div>
     </div>
   );

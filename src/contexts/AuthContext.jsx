@@ -104,6 +104,7 @@ export const AuthProvider = ({ children }) => {
     isCustomer: normalizedRole === 'customer',
     isEmployee: normalizedRole === 'employee' || normalizedRole === 'staff',
     isAdmin: normalizedRole === 'admin',
+    isManager: normalizedRole === 'manager',
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
