@@ -45,6 +45,7 @@ import StaffDesignReviewDetail from "../pages/Staff/StaffDesignReviewDetail";
 import StaffDesignReviewsList from "../pages/Staff/StaffDesignReviewsList";
 import StaffCustomOrderManagementDetail from "../pages/Staff/StaffCustomOrderManagementDetail";
 import StaffCustomOrdersManagement from "../pages/Staff/StaffCustomOrdersManagement";
+import StaffCustomItemPrinting from "../pages/Staff/StaffCustomItemPrinting";
 
 const AppRouter = () => {
   return (
@@ -210,6 +211,15 @@ const AppRouter = () => {
               </PrivateRoute>
             }
           />
+          <Route
+            path="/staff/custom-orders/:orderId/items/:itemId/printing"
+            element={
+              <PrivateRoute requiredRole="employee">
+                <StaffCustomItemPrinting />
+              </PrivateRoute>
+            }
+          />
+
           <Route
             path="/staff/custom-orders-management"
             element={
