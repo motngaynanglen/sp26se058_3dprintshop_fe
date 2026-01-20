@@ -3,7 +3,7 @@ name: Deploy Frontend to Vietnix (Port 5000)
 on:
   push:
     branches: [ "main" ]
-
+  workflow_dispatch:      # Cho phép bấm nút chạy thủ công nếu cần
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
