@@ -106,7 +106,7 @@ const Header = () => {
                     Xin chào,
                   </Typography.Text>
                   <Typography.Text strong style={{ maxWidth: 180 }} ellipsis>
-                    {user?.name || user?.email}
+                    {user?.fullName || user?.username}
                   </Typography.Text>
                 </Space>
                 <Button onClick={handleLogout}>Đăng xuất</Button>

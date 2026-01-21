@@ -110,11 +110,14 @@ const AppRouter = () => {
         <Route
           path="/manager/feedback"
           element={
-            <PrivateRoute requiredRole="manager">
-              <ManagerLayout>
-                <FeedbackList />
-              </ManagerLayout>
-            </PrivateRoute>
+            // <PrivateRoute requiredRole="manager">
+            //   <ManagerLayout>
+            //     <FeedbackList />
+            //   </ManagerLayout>
+            // </PrivateRoute>
+            <ManagerLayout>
+              <FeedbackList />
+            </ManagerLayout>
           }
         />
 

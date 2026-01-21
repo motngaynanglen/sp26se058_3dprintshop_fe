@@ -48,10 +48,26 @@ const AuthModal = () => {
     // TODO: Bật lại khi API đã sửa xong
     setTimeout(() => {
       setLoading(false);
+      
+      // ✅ Mock user data để test UI
+      const mockUser = {
+        id: 1,
+        username: loginForm.username,
+        fullName: 'Khách hàng Test',
+        image: null,
+        role: 'Customer'
+      };
+      
+      // ✅ Lưu vào localStorage để AuthContext đọc lại khi reload
+      localStorage.setItem('user', JSON.stringify(mockUser));
+      localStorage.setItem('token', 'mock-token-123');
+      
       // Giả lập đăng nhập thành công
       alert('Đăng nhập thành công! (API đã tắt tạm thời)');
       handleClose();
-      navigate('/');
+      
+      // ✅ Reload page để AuthContext đọc lại localStorage
+      window.location.href = '/';
     }, 1000);
 
     /* API call đã tắt
@@ -91,21 +107,26 @@ const AuthModal = () => {
     // TODO: Bật lại khi API đã sửa xong
     setTimeout(() => {
       setLoading(false);
+      
+      // ✅ Mock user data sau khi đăng ký thành công
+      const mockUser = {
+        id: Math.floor(Math.random() * 1000),
+        username: registerForm.username,
+        fullName: registerForm.fullName,
+        image: null,
+        role: 'Customer'
+      };
+      
+      // ✅ Lưu vào localStorage để AuthContext đọc lại khi reload
+      localStorage.setItem('user', JSON.stringify(mockUser));
+      localStorage.setItem('token', 'mock-token-' + Date.now());
+      
       // Giả lập đăng ký thành công
       alert('Đăng ký thành công! (API đã tắt tạm thời)');
-      // Chuyển sang chế độ đăng nhập sau khi đăng ký thành công
-      setMode('login');
-      setRegisterForm({
-        username: '',
-        fullName: '',
-        email: '',
-        phoneNumber: '',
-        password: '',
-        confirmPassword: '',
-      });
-      setError('');
-      // Có thể tự động điền username vào form đăng nhập
-      setLoginForm({ username: registerForm.username, password: '' });
+      handleClose();
+      
+      // ✅ Reload page để AuthContext đọc lại localStorage và tự động đăng nhập
+      window.location.href = '/';
     }, 1000);
 
     /* API call đã tắt

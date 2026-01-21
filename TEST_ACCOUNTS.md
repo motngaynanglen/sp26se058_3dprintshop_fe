@@ -23,6 +23,13 @@ Use these accounts to test the application with different user roles:
 - **Role:** Administrator
 - **Access:** Admin dashboard, manage products, materials, staff accounts, users, feedback, system settings
 
+## Manager Account
+- **Email:** `manager@test.com`
+- **Phone:** `0999888777`
+- **Password:** `manager123`
+- **Role:** Manager
+- **Access:** Manager dashboard, view business metrics, analytics, revenue reports, order statistics, material usage, customer feedback overview
+
 ## Notes:
 - For OTP login, use the phone numbers above with any OTP code (for testing purposes)
 - All passwords are case-sensitive
