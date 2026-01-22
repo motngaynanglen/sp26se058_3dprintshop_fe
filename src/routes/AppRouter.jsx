@@ -72,9 +72,11 @@ const AppRouter = () => {
         <Route
           path="/manager/dashboard"
           element={
-            <ManagerLayout>
-              <ManagerDashboard />
-            </ManagerLayout>
+            <PrivateRoute requiredRole="manager">
+              <ManagerLayout>
+                <ManagerDashboard />
+              </ManagerLayout>
+            </PrivateRoute>
           }
         />
         <Route
@@ -110,14 +112,14 @@ const AppRouter = () => {
         <Route
           path="/manager/feedback"
           element={
-            // <PrivateRoute requiredRole="manager">
-            //   <ManagerLayout>
-            //     <FeedbackList />
-            //   </ManagerLayout>
-            // </PrivateRoute>
-            <ManagerLayout>
-              <FeedbackList />
-            </ManagerLayout>
+            <PrivateRoute requiredRole="manager">
+              <ManagerLayout>
+                <FeedbackList />
+              </ManagerLayout>
+            </PrivateRoute>
+            // <ManagerLayout>
+            //   <FeedbackList />
+            // </ManagerLayout>
           }
         />
 

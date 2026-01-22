@@ -49,13 +49,29 @@ const AuthModal = () => {
     setTimeout(() => {
       setLoading(false);
       
+      // ✅ Detect role từ username/email để test
+      const username = loginForm.username.toLowerCase();
+      let role = 'Customer'; // Default
+      let fullName = 'Khách hàng Test';
+      
+      if (username.includes('manager')) {
+        role = 'Manager';
+        fullName = 'Quản lý Test';
+      } else if (username.includes('admin')) {
+        role = 'Admin';
+        fullName = 'Admin Test';
+      } else if (username.includes('employee') || username.includes('staff')) {
+        role = 'Employee';
+        fullName = 'Nhân viên Test';
+      }
+      
       // ✅ Mock user data để test UI
       const mockUser = {
         id: 1,
         username: loginForm.username,
-        fullName: 'Khách hàng Test',
+        fullName: fullName,
         image: null,
-        role: 'Customer'
+        role: role
       };
       
       // ✅ Lưu vào localStorage để AuthContext đọc lại khi reload
@@ -63,11 +79,27 @@ const AuthModal = () => {
       localStorage.setItem('token', 'mock-token-123');
       
       // Giả lập đăng nhập thành công
-      alert('Đăng nhập thành công! (API đã tắt tạm thời)');
+      alert(`Đăng nhập thành công với role: ${role}! (API đã tắt tạm thời)`);
       handleClose();
       
-      // ✅ Reload page để AuthContext đọc lại localStorage
-      window.location.href = '/';
+      // ✅ Redirect dựa vào role
+      let redirectPath = '/';
+      switch(role.toLowerCase()) {
+        case 'manager':
+          redirectPath = '/manager/dashboard';
+          break;
+        case 'admin':
+          redirectPath = '/admin/dashboard';
+          break;
+        case 'employee':
+        case 'staff':
+          redirectPath = '/staff/dashboard';
+          break;
+        default:
+          redirectPath = '/';
+      }
+      
+      window.location.href = redirectPath;
     }, 1000);
 
     /* API call đã tắt

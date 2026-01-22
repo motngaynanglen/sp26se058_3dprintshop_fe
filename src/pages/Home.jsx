@@ -1,5 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import '@google/model-viewer'; // Import model-viewer web component
+
+// Import images
+import img1 from '../components/imgs/1.png';
+import img2 from '../components/imgs/2.png';
 
 const categories = [
   'Mô hình trang trí',
@@ -9,6 +14,62 @@ const categories = [
   'Linh kiện kỹ thuật',
   'Dịch vụ thiết kế 3D',
 ];
+
+// Interactive Card Component
+const InteractiveCard = ({ title, image, modelSrc, to }) => {
+  const [isHovered, setIsHovered] = useState(false);
+
+  return (
+    <Link
+      to={to}
+      className="group relative block overflow-hidden rounded-xl bg-white shadow-md border border-slate-200 no-underline h-48 sm:h-56"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {/* Background Image (Static) */}
+      <div className={`absolute inset-0 transition-opacity duration-500 ${isHovered ? 'opacity-0' : 'opacity-100'}`}>
+         {image ? (
+            <img 
+              src={image} 
+              alt={title} 
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" 
+            />
+         ) : (
+            <div className="h-full w-full bg-slate-100 flex items-center justify-center text-xs text-slate-400">
+               Hình minh họa
+            </div>
+         )}
+      </div>
+
+      {/* 3D Model Viewer (Dynamic on Hover) */}
+      <div className={`absolute inset-0 transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+        {/* Note: model-viewer is a web component, React passes props as attributes */}
+        <model-viewer
+          src={modelSrc}
+          poster={image} // Load image while model lazy loads
+          camera-controls
+          auto-rotate
+          shadow-intensity="1"
+          environment-image="neutral"
+          exposure="1"
+          autoplay
+          interaction-prompt="none" // Disable hand animation
+          style={{ width: '100%', height: '100%' }}
+        />
+      </div>
+
+      {/* Overlay Content */}
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4">
+        <h3 className="text-sm sm:text-base font-semibold text-white group-hover:text-indigo-300 transition-colors">
+          {title}
+        </h3>
+        <p className="text-[10px] sm:text-xs text-slate-300 opacity-80 mt-1">
+          {isHovered ? 'Click để xem chi tiết' : 'Khám phá ngay'}
+        </p>
+      </div>
+    </Link>
+  );
+};
 
 const Home = () => {
   return (
@@ -128,32 +189,53 @@ const Home = () => {
         </div>
       </section>
 
-      {/* Dãy danh mục nổi bật */}
+      {/* Dãy danh mục nổi bật (Updated with 3D Models) */}
       <section className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-base sm:text-lg font-semibold text-slate-900">
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
             Danh mục nổi bật
+            <span className="ml-2 text-sm font-normal text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">New 3D Preview ✨</span>
           </h2>
           <Link
             to="/products"
-            className="text-xs sm:text-sm font-medium text-indigo-600 hover:underline no-underline"
+            className="text-sm font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1 no-underline"
           >
-            Xem tất cả sản phẩm
+            Xem tất cả <span className="text-lg">›</span>
           </Link>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {categories.map((item) => (
-            <Link
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 lg:gap-6">
+          {/* Card 1: Mô hình trang trí - Uses Image 1 & Demo Model */}
+          <InteractiveCard 
+            title="Mô hình trang trí" 
+            image={img1} 
+            modelSrc="https://modelviewer.dev/shared-assets/models/Astronaut.glb"
+            to={`/products?category=${encodeURIComponent('Mô hình trang trí')}`}
+          />
+
+          {/* Card 2: Phụ kiện công nghệ - Uses Image 2 & Demo Model */}
+          <InteractiveCard 
+            title="Phụ kiện công nghệ" 
+            image={img2} 
+            modelSrc="https://modelviewer.dev/shared-assets/models/RobotExpressive.glb"
+            to={`/products?category=${encodeURIComponent('Phụ kiện công nghệ')}`}
+          />
+
+          {/* Standard Cards for others (Placeholder) */}
+          {categories.slice(2).map((item) => (
+             <Link
               key={item}
               to={`/products?category=${encodeURIComponent(item)}`}
-              className="group relative overflow-hidden rounded-lg bg-white shadow-sm border border-slate-200 no-underline"
+              className="group relative block overflow-hidden rounded-xl bg-white shadow-md border border-slate-200 no-underline h-48 sm:h-56"
             >
-              <div className="h-20 bg-slate-100 flex items-center justify-center text-[11px] text-slate-400">
-                Hình minh họa
+              <div className="h-full w-full bg-slate-50 flex items-center justify-center text-slate-300">
+                <span className="text-4xl opacity-20">📦</span>
               </div>
-              <div className="px-3 py-2 text-xs font-medium text-slate-700 group-hover:text-indigo-600">
-                {item}
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-4">
+                <h3 className="text-sm sm:text-base font-semibold text-white group-hover:text-indigo-300 transition-colors">
+                  {item}
+                </h3>
+                <p className="text-[10px] sm:text-xs text-slate-300 opacity-80 mt-1">Khám phá ngay</p>
               </div>
             </Link>
           ))}
@@ -237,4 +319,3 @@ const Home = () => {
 };
 
 export default Home;
-
