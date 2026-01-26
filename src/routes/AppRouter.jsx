@@ -26,6 +26,7 @@ import MyCustomOrders from "../pages/MyCustomOrders";
 import CustomOrderDetail from "../pages/CustomOrderDetail";
 import Preview3D from "../pages/Preview3D";
 import FeedbackForm from "../pages/FeedbackForm";
+import Design3DCustomizer from "../pages/Design3DCustomizer";
 
 // Staff Pages
 import StaffDashboard from "../pages/Staff/StaffDashboard";
@@ -46,6 +47,9 @@ import StaffDesignReviewsList from "../pages/Staff/StaffDesignReviewsList";
 import StaffCustomOrderManagementDetail from "../pages/Staff/StaffCustomOrderManagementDetail";
 import StaffCustomOrdersManagement from "../pages/Staff/StaffCustomOrdersManagement";
 import StaffCustomItemPrinting from "../pages/Staff/StaffCustomItemPrinting";
+import StaffTemplateManagement from "../pages/Staff/StaffTemplateManagement";
+import StaffTemplateDetail from "../pages/Staff/StaffTemplateDetail";
+import StaffCreateProductionJob from "../pages/Staff/StaffCreateProductionJob";
 
 const AppRouter = () => {
   return (
@@ -194,6 +198,15 @@ const AppRouter = () => {
             }
           />
 
+          <Route
+            path="/design-customizer"
+            element={
+              <PrivateRoute>
+                <Design3DCustomizer />
+              </PrivateRoute>
+            }
+          />
+
           {/* Staff Routes */}
           <Route
             path="/staff/dashboard"
@@ -239,6 +252,15 @@ const AppRouter = () => {
           />
 
           <Route
+            path="/staff/production-jobs/new"
+            element={
+              <PrivateRoute requiredRole="employee">
+                <StaffCreateProductionJob />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
             path="/staff/design-reviews"
             element={
               <PrivateRoute requiredRole="employee">
@@ -269,6 +291,24 @@ const AppRouter = () => {
             element={
               <PrivateRoute requiredRole="employee">
                 <DesignFileUpload />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/staff/templates"
+            element={
+              <PrivateRoute requiredRole="employee">
+                <StaffTemplateManagement />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/staff/templates/:id"
+            element={
+              <PrivateRoute requiredRole="employee">
+                <StaffTemplateDetail />
               </PrivateRoute>
             }
           />
