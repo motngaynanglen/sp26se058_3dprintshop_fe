@@ -131,12 +131,18 @@ const StaffCustomOrdersList = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
+<<<<<<< HEAD
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">📦 Quản lý đơn hàng</h1>
           <p className="text-gray-500 text-sm mt-1">Danh sách đơn hàng từ bảng Order, OrderItem</p>
         </div>
+=======
+      <div className="max-w-7xl mx-auto">
+        <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-gray-800">Đơn hàng tùy chỉnh</h1>
+>>>>>>> a07e3d5110528856f49319fcee5e5d4e94dc1e77
         <Link
           to="/staff/dashboard"
           className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 shadow-sm"
@@ -321,12 +327,15 @@ const StaffCustomOrdersList = () => {
           </tbody>
         </table>
       </div>
+<<<<<<< HEAD
 
       {/* Info */}
       <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
         <p className="text-blue-700 text-sm">
           💡 <strong>DB Tables:</strong> Order (OrderStatus, Priority, TotalPrice) → OrderItem (SourceType, FulfillmentStatus) → Customer → Account
         </p>
+=======
+>>>>>>> a07e3d5110528856f49319fcee5e5d4e94dc1e77
       </div>
     </div>
   );

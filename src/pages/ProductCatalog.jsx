@@ -6,121 +6,260 @@ const ProductCatalog = () => {
   const [filters, setFilters] = useState({
     category: '',
     priceRange: '',
-    material: ''
+    material: '',
   });
 
   // Mock products data
   const products = [
-    { id: 1, name: '3D Printed Vase', price: 29.99, category: 'Home Decor', material: 'PLA', stock: 10 },
-    { id: 2, name: 'Custom Phone Case', price: 19.99, category: 'Tech Accessories', material: 'TPU', stock: 25 },
-    { id: 3, name: 'Miniature Figurine', price: 15.99, category: 'Toys & Games', material: 'PLA', stock: 15 },
-    { id: 4, name: 'Jewelry Box', price: 34.99, category: 'Home Decor', material: 'Wood PLA', stock: 8 },
-    { id: 5, name: 'Cable Organizer', price: 12.99, category: 'Tech Accessories', material: 'PLA', stock: 30 },
-    { id: 6, name: 'Art Sculpture', price: 49.99, category: 'Art & Sculptures', material: 'Resin', stock: 5 }
+    {
+      id: 1,
+      name: 'Bộ mô hình trang trí bàn làm việc',
+      price: 299000,
+      category: 'Home Decor',
+      material: 'PLA',
+      stock: 10,
+      badge: '-10%',
+    },
+    {
+      id: 2,
+      name: 'Ốp lưng điện thoại in 3D',
+      price: 199000,
+      category: 'Tech Accessories',
+      material: 'TPU',
+      stock: 25,
+      badge: 'Hot',
+    },
+    {
+      id: 3,
+      name: 'Mô hình nhân vật sưu tầm',
+      price: 459000,
+      category: 'Toys & Games',
+      material: 'Resin',
+      stock: 5,
+      badge: 'New',
+    },
+    {
+      id: 4,
+      name: 'Đế tai nghe / giá trưng bày',
+      price: 249000,
+      category: 'Tech Accessories',
+      material: 'PLA',
+      stock: 18,
+      badge: '-15%',
+    },
+    {
+      id: 5,
+      name: 'Khung mô hình kiến trúc mini',
+      price: 699000,
+      category: 'Art & Sculptures',
+      material: 'PLA',
+      stock: 3,
+      badge: 'Limited',
+    },
+    {
+      id: 6,
+      name: 'Bộ phụ kiện cable management',
+      price: 159000,
+      category: 'Tech Accessories',
+      material: 'PLA',
+      stock: 30,
+      badge: 'Best seller',
+    },
   ];
 
-  const filteredProducts = products.filter(product => {
+  const filteredProducts = products.filter((product) => {
     if (filters.category && product.category !== filters.category) return false;
     if (filters.material && product.material !== filters.material) return false;
+
+    if (filters.priceRange) {
+      if (filters.priceRange === '0-200' && product.price > 200000) return false;
+      if (
+        filters.priceRange === '200-500' &&
+        (product.price < 200000 || product.price > 500000)
+      )
+        return false;
+      if (filters.priceRange === '500+' && product.price < 500000) return false;
+    }
+
     return true;
   });
 
+  const formatPrice = (value) =>
+    `${value.toLocaleString('vi-VN', { maximumFractionDigits: 0 })} đ`;
+
   return (
-    <div className="p-8 max-w-7xl mx-auto">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="m-0 text-gray-800">Product Catalog</h1>
-        <div className="flex gap-2">
+    <div className="space-y-5">
+      {/* Header bộ lọc */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-lg sm:text-xl font-semibold text-slate-900 m-0">
+            Danh sách sản phẩm in 3D
+          </h1>
+          <p className="mt-1 text-xs sm:text-sm text-slate-500">
+            Chọn nhanh các mẫu in sẵn hoặc dùng như gợi ý cho đơn in theo yêu cầu của bạn.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 self-start">
           <button
-            className={`p-2 border rounded transition-all ${viewMode === 'grid' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white border-gray-300'}`}
+            className={`flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
+              viewMode === 'grid'
+                ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-400'
+            }`}
             onClick={() => setViewMode('grid')}
           >
-            Grid
+            <span>🔳</span>
+            <span>Grid</span>
           </button>
           <button
-            className={`p-2 border rounded transition-all ${viewMode === 'list' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white border-gray-300'}`}
+            className={`flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
+              viewMode === 'list'
+                ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-400'
+            }`}
             onClick={() => setViewMode('list')}
           >
-            List
+            <span>📋</span>
+            <span>List</span>
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[250px_1fr] gap-8">
-        <aside className="bg-white p-6 rounded-lg shadow-md h-fit sticky top-24">
-          <h3 className="m-0 mb-6 text-gray-800">Filters</h3>
-          
-          <div className="mb-6">
-            <label className="block mb-2 text-gray-800 font-medium">Category</label>
-            <select
-              value={filters.category}
-              onChange={(e) => setFilters({ ...filters, category: e.target.value })}
-              className="w-full p-2 border border-gray-300 rounded text-sm"
+      <div className="grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)] gap-5">
+        {/* Sidebar bộ lọc */}
+        <aside className="h-fit rounded-xl bg-white border border-slate-200 shadow-sm lg:sticky lg:top-28">
+          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+            <h3 className="m-0 text-sm font-semibold text-slate-900">Bộ lọc tìm kiếm</h3>
+            <button
+              type="button"
+              className="text-[11px] font-medium text-indigo-600 hover:underline"
+              onClick={() => setFilters({ category: '', priceRange: '', material: '' })}
             >
-              <option value="">All Categories</option>
-              <option value="Toys & Games">Toys & Games</option>
-              <option value="Home Decor">Home Decor</option>
-              <option value="Tech Accessories">Tech Accessories</option>
-              <option value="Art & Sculptures">Art & Sculptures</option>
-            </select>
+              Xóa lọc
+            </button>
           </div>
 
-          <div className="mb-6">
-            <label className="block mb-2 text-gray-800 font-medium">Material</label>
-            <select
-              value={filters.material}
-              onChange={(e) => setFilters({ ...filters, material: e.target.value })}
-              className="w-full p-2 border border-gray-300 rounded text-sm"
-            >
-              <option value="">All Materials</option>
-              <option value="PLA">PLA</option>
-              <option value="TPU">TPU</option>
-              <option value="Wood PLA">Wood PLA</option>
-              <option value="Resin">Resin</option>
-            </select>
-          </div>
+          <div className="px-4 py-3 space-y-4 text-xs">
+            <div>
+              <p className="mb-1 font-semibold text-slate-700">Danh mục</p>
+              <select
+                value={filters.category}
+                onChange={(e) => setFilters({ ...filters, category: e.target.value })}
+                className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-indigo-500"
+              >
+                <option value="">Tất cả</option>
+                <option value="Toys & Games">Mô hình / đồ chơi</option>
+                <option value="Home Decor">Trang trí</option>
+                <option value="Tech Accessories">Phụ kiện công nghệ</option>
+                <option value="Art & Sculptures">Nghệ thuật / điêu khắc</option>
+              </select>
+            </div>
 
-          <div className="mb-6">
-            <label className="block mb-2 text-gray-800 font-medium">Price Range</label>
-            <select
-              value={filters.priceRange}
-              onChange={(e) => setFilters({ ...filters, priceRange: e.target.value })}
-              className="w-full p-2 border border-gray-300 rounded text-sm"
-            >
-              <option value="">All Prices</option>
-              <option value="0-20">$0 - $20</option>
-              <option value="20-40">$20 - $40</option>
-              <option value="40+">$40+</option>
-            </select>
-          </div>
+            <div>
+              <p className="mb-1 font-semibold text-slate-700">Vật liệu</p>
+              <select
+                value={filters.material}
+                onChange={(e) => setFilters({ ...filters, material: e.target.value })}
+                className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-indigo-500"
+              >
+                <option value="">Tất cả</option>
+                <option value="PLA">PLA</option>
+                <option value="TPU">TPU dẻo</option>
+                <option value="Resin">Resin</option>
+              </select>
+            </div>
 
-          <button
-            className="w-full p-3 bg-gray-100 border-none rounded cursor-pointer font-medium transition-colors hover:bg-gray-200"
-            onClick={() => setFilters({ category: '', priceRange: '', material: '' })}
-          >
-            Clear Filters
-          </button>
+            <div>
+              <p className="mb-1 font-semibold text-slate-700">Khoảng giá</p>
+              <select
+                value={filters.priceRange}
+                onChange={(e) => setFilters({ ...filters, priceRange: e.target.value })}
+                className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-indigo-500"
+              >
+                <option value="">Tất cả</option>
+                <option value="0-200">Dưới 200.000 đ</option>
+                <option value="200-500">200.000 - 500.000 đ</option>
+                <option value="500+">Trên 500.000 đ</option>
+              </select>
+            </div>
+
+            <div className="rounded-lg bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
+              Gợi ý: nếu bạn chỉ cần tham khảo giá để đặt in mẫu riêng, hãy dùng tính năng{' '}
+              <span className="font-semibold text-indigo-600">Đặt in theo yêu cầu</span> ở menu
+              trên.
+            </div>
+          </div>
         </aside>
 
-        <main>
-          <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6' : 'flex flex-col gap-6'}>
-            {filteredProducts.map(product => (
-              <div key={product.id} className={`bg-white rounded-lg overflow-hidden shadow-md transition-all hover:-translate-y-1 hover:shadow-xl ${viewMode === 'list' ? 'flex flex-row' : 'flex flex-col'}`}>
-                <div className={`bg-gray-200 flex items-center justify-center text-gray-500 ${viewMode === 'grid' ? 'w-full h-48' : 'w-48 h-48 flex-shrink-0'}`}>
-                  Image
+        {/* Danh sách sản phẩm */}
+        <main className="space-y-3">
+          <div className="flex items-center justify-between text-[11px] text-slate-500">
+            <span>
+              Tìm thấy <b>{filteredProducts.length}</b> sản phẩm
+            </span>
+            <span>Giá đã bao gồm chi phí vật liệu in cơ bản</span>
+          </div>
+
+          <div
+            className={
+              viewMode === 'grid'
+                ? 'grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4'
+                : 'flex flex-col gap-3'
+            }
+          >
+            {filteredProducts.map((product) => (
+              <Link
+                key={product.id}
+                to={`/products/${product.id}`}
+                className={`group rounded-xl bg-white border border-slate-200 shadow-sm overflow-hidden no-underline ${
+                  viewMode === 'list' ? 'flex flex-row' : 'flex flex-col'
+                }`}
+              >
+                <div
+                  className={`relative bg-slate-100 flex items-center justify-center text-[11px] text-slate-400 ${
+                    viewMode === 'grid' ? 'aspect-[4/3]' : 'w-32 sm:w-40 md:w-48 h-28 sm:h-32'
+                  }`}
+                >
+                  Hình sản phẩm
+                  {product.badge && (
+                    <span className="absolute left-2 top-2 rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
+                      {product.badge}
+                    </span>
+                  )}
                 </div>
-                <div className="p-6 flex-1 flex flex-col">
-                  <h3 className="m-0 mb-2 text-gray-800">{product.name}</h3>
-                  <p className="my-1 text-gray-600 text-sm">{product.category}</p>
-                  <p className="my-1 text-gray-600 text-sm">Material: {product.material}</p>
-                  <p className="my-1 text-gray-600 text-sm">In Stock: {product.stock}</p>
-                  <div className="mt-auto flex justify-between items-center pt-4">
-                    <span className="text-2xl font-bold text-indigo-600">${product.price}</span>
-                    <Link to={`/products/${product.id}`} className="py-2 px-4 bg-indigo-600 text-white no-underline rounded transition-colors hover:bg-indigo-700">
-                      View Details
-                    </Link>
+
+                <div className="flex-1 p-3 sm:p-4 flex flex-col gap-1">
+                  <p className="text-xs sm:text-sm font-medium text-slate-900 group-hover:text-indigo-600 line-clamp-2 m-0">
+                    {product.name}
+                  </p>
+                  <p className="text-[11px] text-slate-500 m-0">
+                    {product.category} • {product.material}
+                  </p>
+                  <p className="text-[11px] text-emerald-600 font-medium m-0">
+                    Còn {product.stock} sản phẩm
+                  </p>
+
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <span className="text-sm sm:text-base font-semibold text-rose-600">
+                      {formatPrice(product.price)}
+                    </span>
+                    <button
+                      type="button"
+                      className="hidden sm:inline-flex items-center justify-center rounded-full border border-indigo-500 px-3 py-1 text-[11px] font-medium text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors"
+                    >
+                      Thêm vào giỏ
+                    </button>
                   </div>
+
+                  {viewMode === 'list' && (
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Phù hợp làm mẫu tham khảo cho dự án in 3D riêng, có thể tùy chỉnh kích thước và
+                      vật liệu khi đặt in.
+                    </p>
+                  )}
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </main>

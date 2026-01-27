@@ -213,6 +213,7 @@ const StaffCustomOrderDetail = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
+<<<<<<< HEAD
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
@@ -230,6 +231,13 @@ const StaffCustomOrderDetail = () => {
         <span className={`px-4 py-2 rounded-lg font-medium ${orderStatusConfig[order.orderStatus]?.color}`}>
           {orderStatusConfig[order.orderStatus]?.label}
         </span>
+=======
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-4">
+        <Link to="/staff/custom-orders" className="text-indigo-600 hover:text-indigo-800 font-medium">
+          ← Quay lại danh sách đơn hàng
+        </Link>
+>>>>>>> a07e3d5110528856f49319fcee5e5d4e94dc1e77
       </div>
 
       <div className="grid grid-cols-3 gap-6">
@@ -490,6 +498,7 @@ const StaffCustomOrderDetail = () => {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
