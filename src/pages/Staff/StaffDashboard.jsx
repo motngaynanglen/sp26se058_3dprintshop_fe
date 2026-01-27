@@ -103,7 +103,6 @@ const StaffDashboard = () => {
   };
 
   return (
-<<<<<<< HEAD
     <div className="min-h-screen bg-gray-50/50 p-6 lg:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
@@ -111,11 +110,6 @@ const StaffDashboard = () => {
           <h1 className="text-2xl font-bold text-gray-800">Staff Dashboard</h1>
           <p className="text-sm text-gray-500">Xin chào, chúc bạn một ngày làm việc hiệu quả! 👋</p>
         </div>
-=======
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6 text-gray-800">Bảng điều khiển nhân viên</h1>
->>>>>>> a07e3d5110528856f49319fcee5e5d4e94dc1e77
 
         {/* Quick Navigation */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -267,7 +261,6 @@ const StatCard = ({ icon, iconBg, iconColor, title, value, change, isUp }) => {
             </span>
           </div>
         </div>
-      </div>
       </div>
     </div>
   );
