@@ -155,7 +155,6 @@ const StaffTemplateManagement = () => {
                     <div className="flex flex-col sm:flex-row gap-4">
                         {/* Search */}
                         <div className="relative flex-1">
-                            <SearchIcon />
                             <input
                                 type="text"
                                 placeholder="Tìm kiếm theo tên hoặc mã..."
@@ -163,7 +162,7 @@ const StaffTemplateManagement = () => {
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             />
-                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
                                 <SearchIcon />
                             </div>
                         </div>
@@ -175,8 +174,8 @@ const StaffTemplateManagement = () => {
                                     key={status}
                                     onClick={() => setStatusFilter(status)}
                                     className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${statusFilter === status
-                                            ? "bg-blue-600 text-white"
-                                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                        ? "bg-blue-600 text-white"
+                                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                                         }`}
                                 >
                                     {status === "all" ? "Tất cả" : status.charAt(0).toUpperCase() + status.slice(1)}
@@ -236,8 +235,8 @@ const StaffTemplateManagement = () => {
                                     <button
                                         onClick={() => handleArchive(template.id)}
                                         className={`px-3 py-2 rounded-xl transition-colors ${template.status === "archived"
-                                                ? "bg-green-50 text-green-600 hover:bg-green-100"
-                                                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                            ? "bg-green-50 text-green-600 hover:bg-green-100"
+                                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                                             }`}
                                     >
                                         <ArchiveIcon />
@@ -356,8 +355,8 @@ const AddTemplateModal = ({ onClose }) => {
                                         }));
                                     }}
                                     className={`px-3 py-1 rounded-full text-sm transition-colors ${formData.tags.includes(tag.id)
-                                            ? "bg-blue-600 text-white"
-                                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                        ? "bg-blue-600 text-white"
+                                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                                         }`}
                                 >
                                     {tag.name}

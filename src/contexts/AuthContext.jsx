@@ -121,7 +121,7 @@ export const useAuth = () => {
   return context;
 };
 
-const DEV_MOCK_AUTH = true; // 🔥 bật/tắt tại đây
+const DEV_MOCK_AUTH = false; // 🔥 bật/tắt tại đây
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -148,16 +148,65 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = async (username, password) => {
-    if (DEV_MOCK_AUTH) {
-      const mockUser = {
-        id: 'staff-001',
-        username,
-        fullName: 'Staff Demo',
-        role: 'employee',
-      };
-      setUser(mockUser);
-      return { success: true, user: mockUser };
+    // Mock login logic for testing roles based on TEST_ACCOUNTS.md
+    const MOCK_ACCOUNTS = [
+      {
+        email: 'customer@test.com',
+        phone: '0123456789',
+        password: 'customer123',
+        user: {
+          id: 'customer-001',
+          username: 'customer',
+          fullName: 'Test Customer',
+          role: 'Customer',
+        }
+      },
+      {
+        email: 'employee@test.com',
+        phone: '0987654321',
+        password: 'employee123',
+        user: {
+          id: 'staff-001',
+          username: 'employee',
+          fullName: 'Test Employee',
+          role: 'Employee',
+        }
+      },
+      {
+        email: 'admin@test.com',
+        phone: '0111222333',
+        password: 'admin123',
+        user: {
+          id: 'admin-001',
+          username: 'admin',
+          fullName: 'Test Admin',
+          role: 'Admin',
+        }
+      },
+      {
+        email: 'manager@test.com',
+        phone: '0999888777',
+        password: 'manager123',
+        user: {
+          id: 'manager-001',
+          username: 'manager',
+          fullName: 'Test Manager',
+          role: 'Manager',
+        }
+      }
+    ];
+
+    const foundAccount = MOCK_ACCOUNTS.find(
+      acc => (acc.email === username.toLowerCase() || acc.phone === username) && acc.password === password
+    );
+
+    if (foundAccount) {
+      setUser(foundAccount.user);
+      localStorage.setItem('user', JSON.stringify(foundAccount.user));
+      return { success: true, user: foundAccount.user };
     }
+
+    // Nếu không phải các tài khoản test trên, gọi API thật (bỏ qua đoạn check DEV_MOCK_AUTH cũ)
 
     try {
       const res = await loginApi({ username, password });
