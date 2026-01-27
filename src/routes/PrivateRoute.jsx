@@ -21,8 +21,16 @@ const PrivateRoute = ({ children, requiredRole }) => {
 
   if (requiredRole) {
     const normalizedRole = user?.role?.toLowerCase();
-    if (normalizedRole !== requiredRole.toLowerCase()) {
-      return <Navigate to="/" replace />;
+
+    if (Array.isArray(requiredRole)) {
+      const normalizedRequiredRoles = requiredRole.map(r => r.toLowerCase());
+      if (!normalizedRequiredRoles.includes(normalizedRole)) {
+        return <Navigate to="/" replace />;
+      }
+    } else {
+      if (normalizedRole !== requiredRole.toLowerCase()) {
+        return <Navigate to="/" replace />;
+      }
     }
   }
 

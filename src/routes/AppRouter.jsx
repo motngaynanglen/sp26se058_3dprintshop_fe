@@ -45,16 +45,16 @@ import StaffTemplateManagement from "../pages/Staff/StaffTemplateManagement";
 import StaffTemplateDetail from "../pages/Staff/StaffTemplateDetail";
 import StaffCreateProductionJob from "../pages/Staff/StaffCreateProductionJob";
 
-// Admin Pages
-import AdminDashboard from "../pages/Admin/AdminDashboard";
-import ManageProducts from "../pages/Admin/ManageProducts";
-import ManageMaterials from "../pages/Admin/ManageMaterials";
-import ManageStaffAccounts from "../pages/Admin/ManageStaffAccounts";
-import ManageUsers from "../pages/Admin/ManageUsers";
-import FeedbackList from "../pages/Admin/FeedbackList";
-import SystemSettings from "../pages/Admin/SystemSettings";
+// Admin Pages (using Manager components for now as Admin folder is missing)
+import AdminDashboard from "../pages/Manager/ManagerDashboard";
+import ManageProducts from "../pages/Manager/ManageProducts";
+import ManageMaterials from "../pages/Manager/ManageMaterials";
+import ManageStaffAccounts from "../pages/Manager/ManageStaffAccounts";
+import ManageUsers from "../pages/Manager/ManageUsers";
+import FeedbackList from "../pages/Manager/FeedbackList";
+import SystemSettings from "../pages/Manager/SystemSettings";
 
-// Manager Pages
+// Manager Pages (Already imported via above or handled)
 import ManagerDashboard from '../pages/Manager/ManagerDashboard';
 
 // Component để redirect login/register và mở modal
@@ -84,7 +84,7 @@ const AppRouter = () => {
         <Route
           path="/manager/dashboard"
           element={
-            <PrivateRoute requiredRole="manager">
+            <PrivateRoute requiredRole={['manager', 'admin']}>
               <ManagerLayout>
                 <ManagerDashboard />
               </ManagerLayout>
@@ -94,7 +94,7 @@ const AppRouter = () => {
         <Route
           path="/manager/products"
           element={
-            <PrivateRoute requiredRole="manager">
+            <PrivateRoute requiredRole={['manager', 'admin']}>
               <ManagerLayout>
                 <ManageProducts />
               </ManagerLayout>
@@ -104,7 +104,7 @@ const AppRouter = () => {
         <Route
           path="/manager/materials"
           element={
-            <PrivateRoute requiredRole="manager">
+            <PrivateRoute requiredRole={['manager', 'admin']}>
               <ManagerLayout>
                 <ManageMaterials />
               </ManagerLayout>
@@ -114,7 +114,7 @@ const AppRouter = () => {
         <Route
           path="/manager/staff"
           element={
-            <PrivateRoute requiredRole="manager">
+            <PrivateRoute requiredRole={['manager', 'admin']}>
               <ManagerLayout>
                 <ManageStaffAccounts />
               </ManagerLayout>
@@ -124,7 +124,7 @@ const AppRouter = () => {
         <Route
           path="/manager/feedback"
           element={
-            <PrivateRoute requiredRole="manager">
+            <PrivateRoute requiredRole={['manager', 'admin']}>
               <ManagerLayout>
                 <FeedbackList />
               </ManagerLayout>
@@ -136,97 +136,121 @@ const AppRouter = () => {
         <Route
           path="/staff/dashboard"
           element={
-            <PrivateRoute requiredRole="employee">
-              <StaffDashboard />
-            </PrivateRoute>
+            <Layout>
+              <PrivateRoute requiredRole="employee">
+                <StaffDashboard />
+              </PrivateRoute>
+            </Layout>
           }
         />
         <Route
           path="/staff/custom-orders"
           element={
-            <PrivateRoute requiredRole="employee">
-              <StaffCustomOrdersList />
-            </PrivateRoute>
+            <Layout>
+              <PrivateRoute requiredRole="employee">
+                <StaffCustomOrdersList />
+              </PrivateRoute>
+            </Layout>
           }
         />
         <Route
           path="/staff/custom-orders/:id"
           element={
-            <PrivateRoute requiredRole="employee">
-              <StaffCustomOrderDetail />
-            </PrivateRoute>
+            <Layout>
+              <PrivateRoute requiredRole="employee">
+                <StaffCustomOrderDetail />
+              </PrivateRoute>
+            </Layout>
           }
         />
         <Route
           path="/staff/custom-orders/:orderId/items/:itemId/printing"
           element={
-            <PrivateRoute requiredRole="employee">
-              <StaffCustomItemPrinting />
-            </PrivateRoute>
+            <Layout>
+              <PrivateRoute requiredRole="employee">
+                <StaffCustomItemPrinting />
+              </PrivateRoute>
+            </Layout>
           }
         />
         <Route
           path="/staff/custom-orders-management"
           element={
-            <PrivateRoute requiredRole="employee">
-              <StaffCustomOrdersManagement />
-            </PrivateRoute>
+            <Layout>
+              <PrivateRoute requiredRole="employee">
+                <StaffCustomOrdersManagement />
+              </PrivateRoute>
+            </Layout>
           }
         />
         <Route
           path="/staff/custom-orders-management/:id"
           element={
-            <PrivateRoute requiredRole="employee">
-              <StaffCustomOrderManagementDetail />
-            </PrivateRoute>
+            <Layout>
+              <PrivateRoute requiredRole="employee">
+                <StaffCustomOrderManagementDetail />
+              </PrivateRoute>
+            </Layout>
           }
         />
         <Route
           path="/staff/production-jobs/new"
           element={
-            <PrivateRoute requiredRole="employee">
-              <StaffCreateProductionJob />
-            </PrivateRoute>
+            <Layout>
+              <PrivateRoute requiredRole="employee">
+                <StaffCreateProductionJob />
+              </PrivateRoute>
+            </Layout>
           }
         />
         <Route
           path="/staff/design-reviews"
           element={
-            <PrivateRoute requiredRole="employee">
-              <StaffDesignReviewsList />
-            </PrivateRoute>
+            <Layout>
+              <PrivateRoute requiredRole="employee">
+                <StaffDesignReviewsList />
+              </PrivateRoute>
+            </Layout>
           }
         />
         <Route
           path="/staff/design-reviews/:id"
           element={
-            <PrivateRoute requiredRole="employee">
-              <StaffDesignReviewDetail />
-            </PrivateRoute>
+            <Layout>
+              <PrivateRoute requiredRole="employee">
+                <StaffDesignReviewDetail />
+              </PrivateRoute>
+            </Layout>
           }
         />
         <Route
           path="/staff/upload-design/:orderId"
           element={
-            <PrivateRoute requiredRole="employee">
-              <DesignFileUpload />
-            </PrivateRoute>
+            <Layout>
+              <PrivateRoute requiredRole="employee">
+                <DesignFileUpload />
+              </PrivateRoute>
+            </Layout>
           }
         />
         <Route
           path="/staff/templates"
           element={
-            <PrivateRoute requiredRole="employee">
-              <StaffTemplateManagement />
-            </PrivateRoute>
+            <Layout>
+              <PrivateRoute requiredRole="employee">
+                <StaffTemplateManagement />
+              </PrivateRoute>
+            </Layout>
           }
         />
         <Route
           path="/staff/templates/:id"
           element={
-            <PrivateRoute requiredRole="employee">
-              <StaffTemplateDetail />
-            </PrivateRoute>
+            <Layout>
+              <PrivateRoute requiredRole="employee">
+                <StaffTemplateDetail />
+              </PrivateRoute>
+            </Layout>
           }
         />
 
@@ -293,9 +317,7 @@ const AppRouter = () => {
           path="/"
           element={
             <Layout>
-              <PublicRoute>
-                <Home />
-              </PublicRoute>
+              <Home />
             </Layout>
           }
         />
@@ -319,9 +341,7 @@ const AppRouter = () => {
           path="/forgot-password"
           element={
             <Layout>
-              <PublicRoute>
-                <ForgotPassword />
-              </PublicRoute>
+              <ForgotPassword />
             </Layout>
           }
         />
