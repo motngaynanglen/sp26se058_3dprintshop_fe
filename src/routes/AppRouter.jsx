@@ -9,6 +9,8 @@ import AuthModal from '../components/Auth/AuthModal';
 
 // General Pages
 import Home from '../pages/Home';
+import Login from '../pages/Login';
+import Register from '../pages/Register';
 import ForgotPassword from '../pages/ForgotPassword';
 import ProductCatalog from '../pages/ProductCatalog';
 import ProductDetail from '../pages/ProductDetail';
@@ -19,31 +21,41 @@ import MyOrders from '../pages/MyOrders';
 import OrderDetail from '../pages/OrderDetail';
 
 // Customer Pages
-import CustomOrderType from '../pages/CustomOrderType';
-import CustomOrderUpload from '../pages/CustomOrderUpload';
-import CustomOrderRequestDesign from '../pages/CustomOrderRequestDesign';
-import CustomOrderAIGenerate from '../pages/CustomOrderAIGenerate';
-import MyCustomOrders from '../pages/MyCustomOrders';
-import CustomOrderDetail from '../pages/CustomOrderDetail';
-import Preview3D from '../pages/Preview3D';
-import FeedbackForm from '../pages/FeedbackForm';
+import CustomOrderType from "../pages/CustomOrderType";
+import CustomOrderUpload from "../pages/CustomOrderUpload";
+import CustomOrderRequestDesign from "../pages/CustomOrderRequestDesign";
+import CustomOrderAIGenerate from "../pages/CustomOrderAIGenerate";
+import MyCustomOrders from "../pages/MyCustomOrders";
+import CustomOrderDetail from "../pages/CustomOrderDetail";
+import Preview3D from "../pages/Preview3D";
+import FeedbackForm from "../pages/FeedbackForm";
+import Design3DCustomizer from "../pages/Design3DCustomizer";
 
 // Staff Pages
-import StaffDashboard from '../pages/Staff/StaffDashboard';
-import StaffCustomOrdersList from '../pages/Staff/StaffCustomOrdersList';
-import StaffCustomOrderDetail from '../pages/Staff/StaffCustomOrderDetail';
-import DesignFileUpload from '../pages/Staff/DesignFileUpload';
+import StaffDashboard from "../pages/Staff/StaffDashboard";
+import StaffCustomOrdersList from "../pages/Staff/StaffCustomOrdersList";
+import StaffCustomOrderDetail from "../pages/Staff/StaffCustomOrderDetail";
+import DesignFileUpload from "../pages/Staff/DesignFileUpload";
+import StaffDesignReviewDetail from "../pages/Staff/StaffDesignReviewDetail";
+import StaffDesignReviewsList from "../pages/Staff/StaffDesignReviewsList";
+import StaffCustomOrderManagementDetail from "../pages/Staff/StaffCustomOrderManagementDetail";
+import StaffCustomOrdersManagement from "../pages/Staff/StaffCustomOrdersManagement";
+import StaffCustomItemPrinting from "../pages/Staff/StaffCustomItemPrinting";
+import StaffTemplateManagement from "../pages/Staff/StaffTemplateManagement";
+import StaffTemplateDetail from "../pages/Staff/StaffTemplateDetail";
+import StaffCreateProductionJob from "../pages/Staff/StaffCreateProductionJob";
 
 // Admin Pages
-import ManageUsers from '../pages/Manager/ManageUsers';
-import SystemSettings from '../pages/Manager/SystemSettings';
+import AdminDashboard from "../pages/Admin/AdminDashboard";
+import ManageProducts from "../pages/Admin/ManageProducts";
+import ManageMaterials from "../pages/Admin/ManageMaterials";
+import ManageStaffAccounts from "../pages/Admin/ManageStaffAccounts";
+import ManageUsers from "../pages/Admin/ManageUsers";
+import FeedbackList from "../pages/Admin/FeedbackList";
+import SystemSettings from "../pages/Admin/SystemSettings";
 
-//Manager Pages
+// Manager Pages
 import ManagerDashboard from '../pages/Manager/ManagerDashboard';
-import ManageProducts from '../pages/Manager/ManageProducts';
-import ManageMaterials from '../pages/Manager/ManageMaterials';
-import ManageStaffAccounts from '../pages/Manager/ManageStaffAccounts';
-import FeedbackList from '../pages/Manager/FeedbackList';
 
 // Component để redirect login/register và mở modal
 const LoginRedirect = () => {
@@ -67,7 +79,7 @@ const AppRouter = () => {
     <Router>
       <Routes>
         {/* Routes không có Layout (Manager, Admin, Staff) - đặt trước để match trước */}
-        
+
         {/* Manager Routes */}
         <Route
           path="/manager/dashboard"
@@ -117,9 +129,6 @@ const AppRouter = () => {
                 <FeedbackList />
               </ManagerLayout>
             </PrivateRoute>
-            // <ManagerLayout>
-            //   <FeedbackList />
-            // </ManagerLayout>
           }
         />
 
@@ -149,10 +158,74 @@ const AppRouter = () => {
           }
         />
         <Route
+          path="/staff/custom-orders/:orderId/items/:itemId/printing"
+          element={
+            <PrivateRoute requiredRole="employee">
+              <StaffCustomItemPrinting />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/staff/custom-orders-management"
+          element={
+            <PrivateRoute requiredRole="employee">
+              <StaffCustomOrdersManagement />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/staff/custom-orders-management/:id"
+          element={
+            <PrivateRoute requiredRole="employee">
+              <StaffCustomOrderManagementDetail />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/staff/production-jobs/new"
+          element={
+            <PrivateRoute requiredRole="employee">
+              <StaffCreateProductionJob />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/staff/design-reviews"
+          element={
+            <PrivateRoute requiredRole="employee">
+              <StaffDesignReviewsList />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/staff/design-reviews/:id"
+          element={
+            <PrivateRoute requiredRole="employee">
+              <StaffDesignReviewDetail />
+            </PrivateRoute>
+          }
+        />
+        <Route
           path="/staff/upload-design/:orderId"
           element={
             <PrivateRoute requiredRole="employee">
               <DesignFileUpload />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/staff/templates"
+          element={
+            <PrivateRoute requiredRole="employee">
+              <StaffTemplateManagement />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/staff/templates/:id"
+          element={
+            <PrivateRoute requiredRole="employee">
+              <StaffTemplateDetail />
             </PrivateRoute>
           }
         />
@@ -162,7 +235,7 @@ const AppRouter = () => {
           path="/admin/dashboard"
           element={
             <PrivateRoute requiredRole="admin">
-              <ManageUsers />
+              <AdminDashboard />
             </PrivateRoute>
           }
         />
@@ -398,6 +471,14 @@ const AppRouter = () => {
                 <FeedbackForm />
               </PrivateRoute>
             </Layout>
+          }
+        />
+        <Route
+          path="/design-customizer"
+          element={
+            <PrivateRoute>
+              <Design3DCustomizer />
+            </PrivateRoute>
           }
         />
       </Routes>
