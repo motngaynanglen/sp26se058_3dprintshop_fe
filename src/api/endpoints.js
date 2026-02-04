@@ -18,6 +18,19 @@ export const CONCEP_TAG_ENDPOINTS = {
   DELETE: '/api/concept-tag/delete', // appending /{id} in service
 };
 
+export const DESIGN_TEMPLATE_ENDPOINTS = {
+  QUERY: '/api/design-template/query',
+  DETAIL: '/api/design-template/detail', // appending /{id} in service
+  ADD: '/api/design-template/add',
+  UPDATE: '/api/design-template/update', // appending /{id} in service
+  DELETE: '/api/design-template/delete', // appending /{id} in service
+};
+
+export const DESIGN_TAG_ENDPOINTS = {
+  GET_TAGS: '/api/design-template', // appending /{id}/tags in service
+  SYNC: '/api/design-tag/sync',
+};
+
 // Có thể mở rộng thêm các nhóm endpoint khác (PRODUCTS, ORDERS, ...)
 
 

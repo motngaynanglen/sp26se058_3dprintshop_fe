@@ -49,6 +49,8 @@ import StaffCreateProductionJob from "../pages/Staff/StaffCreateProductionJob";
 import AdminDashboard from "../pages/Manager/ManagerDashboard";
 import ManageProducts from "../pages/Manager/ManageProducts";
 import ManageMaterials from "../pages/Manager/ManageMaterials";
+import ManageDesignTemplates from "../pages/Manager/ManageDesignTemplates";
+import DesignTemplateEdit from "../pages/Manager/DesignTemplateEdit";
 import ManageStaffAccounts from "../pages/Manager/ManageStaffAccounts";
 import ManageUsers from "../pages/Manager/ManageUsers";
 import FeedbackList from "../pages/Manager/FeedbackList";
@@ -107,6 +109,36 @@ const AppRouter = () => {
             <PrivateRoute requiredRole={['manager', 'admin']}>
               <ManagerLayout>
                 <ManageMaterials />
+              </ManagerLayout>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/manager/design-templates"
+          element={
+            <PrivateRoute requiredRole={['manager', 'admin']}>
+              <ManagerLayout>
+                <ManageDesignTemplates />
+              </ManagerLayout>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/manager/design-templates/create"
+          element={
+            <PrivateRoute requiredRole={['manager', 'admin']}>
+              <ManagerLayout>
+                <DesignTemplateEdit />
+              </ManagerLayout>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/manager/design-templates/edit/:id"
+          element={
+            <PrivateRoute requiredRole={['manager', 'admin']}>
+              <ManagerLayout>
+                <DesignTemplateEdit />
               </ManagerLayout>
             </PrivateRoute>
           }
