@@ -30,9 +30,9 @@ const MyCustomOrders = () => {
 
   const getTypeLabel = (type) => {
     switch (type) {
-      case 'upload': return 'File Upload';
-      case 'request_design': return 'Design Request';
-      case 'ai_generate': return 'AI Generated';
+      case 'upload': return 'Đăng tải File';
+      case 'request_design': return 'Yêu cầu Thiết kế';
+      case 'ai_generate': return 'AI Tạo mẫu';
       default: return type;
     }
   };
@@ -40,12 +40,12 @@ const MyCustomOrders = () => {
   return (
     <div className="max-w-7xl mx-auto px-8 py-8">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">My Custom Orders</h1>
+        <h1 className="text-3xl font-bold text-gray-800">Đơn hàng Custom của tôi</h1>
         <Link
           to="/custom-order"
           className="py-2 px-6 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
         >
-          + New Custom Order
+          + Tạo đơn Custom mới
         </Link>
       </div>
 
@@ -56,7 +56,7 @@ const MyCustomOrders = () => {
             filter === 'all' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
           }`}
         >
-          All
+          Tất cả
         </button>
         <button
           onClick={() => setFilter('ready_for_preview')}
@@ -64,7 +64,7 @@ const MyCustomOrders = () => {
             filter === 'ready_for_preview' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
           }`}
         >
-          Ready for Preview
+          Chờ duyệt mẫu
         </button>
         <button
           onClick={() => setFilter('pending_approval')}
@@ -72,7 +72,7 @@ const MyCustomOrders = () => {
             filter === 'pending_approval' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
           }`}
         >
-          Pending Approval
+          Chờ duyệt
         </button>
         <button
           onClick={() => setFilter('printing')}
@@ -80,7 +80,7 @@ const MyCustomOrders = () => {
             filter === 'printing' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
           }`}
         >
-          Printing
+          Đang in
         </button>
         <button
           onClick={() => setFilter('completed')}
@@ -88,25 +88,25 @@ const MyCustomOrders = () => {
             filter === 'completed' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
           }`}
         >
-          Completed
+          Hoàn thành
         </button>
       </div>
 
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         {filteredOrders.length === 0 ? (
           <div className="p-12 text-center">
-            <p className="text-gray-600 text-lg">No custom orders found</p>
+            <p className="text-gray-600 text-lg">Không tìm thấy đơn hàng custom nào</p>
           </div>
         ) : (
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Order ID</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Type</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Date</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Status</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Total</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Actions</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Mã đơn hàng</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Loại</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Ngày đặt</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Trạng thái</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Tổng tiền</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -117,18 +117,22 @@ const MyCustomOrders = () => {
                   <td className="px-6 py-4 text-sm text-gray-600">{order.date}</td>
                   <td className="px-6 py-4">
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
-                      {order.status.replace('_', ' ')}
+                      {order.status === 'completed' ? 'Hoàn thành' : 
+                       order.status === 'ready_for_preview' ? 'Sẵn sàng xem trước' :
+                       order.status === 'pending_approval' ? 'Chờ duyệt' :
+                       order.status === 'designing' ? 'Đang thiết kế' :
+                       order.status === 'printing' ? 'Đang in' : order.status}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-sm font-semibold text-gray-800">
-                    {order.total ? `$${order.total.toFixed(2)}` : 'Pending'}
+                    {order.total ? `$${order.total.toFixed(2)}` : 'Đang tính'}
                   </td>
                   <td className="px-6 py-4">
                     <Link
                       to={`/custom-orders/${order.id}`}
                       className="text-indigo-600 hover:text-indigo-800 font-medium"
                     >
-                      View Details
+                      Xem chi tiết
                     </Link>
                   </td>
                 </tr>

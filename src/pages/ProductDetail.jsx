@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import img1 from '../components/imgs/1.png';
+import img2 from '../components/imgs/2.png';
 import {
   Button,
   InputNumber,
@@ -50,10 +52,13 @@ const ProductDetail = () => {
     rating: 4.5,
     reviewCount: 24,
     images: [
-      'https://via.placeholder.com/600x600?text=Product+Image+1',
-      'https://via.placeholder.com/600x600?text=Product+Image+2',
-      'https://via.placeholder.com/600x600?text=Product+Image+3',
-      'https://via.placeholder.com/600x600?text=Product+Image+4'
+      img1,
+      img2,
+      img1,
+      img2,
+      img1,
+      img2,
+      img1
     ],
     specifications: {
       dimensions: '20 x 20 x 15 cm',
@@ -94,19 +99,33 @@ const ProductDetail = () => {
   // Determine if should show Add to Cart
   const showAddToCart = isCustomer;
 
+  const [activeImage, setActiveImage] = useState(null);
+  const scrollContainerRef = React.useRef(null);
+
+  // Set default active image
+  React.useEffect(() => {
+    if (product.images && product.images.length > 0) {
+      setActiveImage(product.images[0]);
+    }
+  }, [id]); // Reset when id changes
+
+  const scroll = (direction) => {
+    if (scrollContainerRef.current) {
+      const { current } = scrollContainerRef;
+      const scrollAmount = 100; // Adjust scroll amount
+      if (direction === 'left') {
+        current.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+      } else {
+        current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Back Button & Breadcrumb */}
         <div className="mb-6">
-          <Button
-            icon={<ArrowLeftOutlined />}
-            onClick={handleGoBack}
-            size="large"
-            className="mb-4"
-          >
-            Quay lại {fromFeedback ? 'Feedback' : ''}
-          </Button>
 
           <Breadcrumb
             items={[
@@ -120,30 +139,64 @@ const ProductDetail = () => {
         {/* Main Product Section */}
         <Card className="mb-6">
           <Row gutter={[32, 32]}>
-            {/* Image Gallery */}
+            {/* Image Gallery - Sticky & Enhanced */}
             <Col xs={24} lg={12}>
-              <div className="sticky top-4">
-                <Image.PreviewGroup>
-                  <div className="mb-4">
-                    <Image
-                      src={product.images[0]}
-                      alt={product.name}
-                      className="w-full rounded-lg"
-                      style={{ maxHeight: 500, objectFit: 'cover' }}
-                    />
-                  </div>
-                  <div className="grid grid-cols-4 gap-2">
+              <div className="sticky top-24">
+                <div className="mb-4 overflow-hidden rounded-lg border border-gray-200">
+                  <Image
+                    src={activeImage || product.images[0]}
+                    alt={product.name}
+                    className="w-full object-contain bg-white"
+                    style={{ maxHeight: '600px', height: '500px', width: '100%' }} // Increased size
+                    preview={{ src: activeImage || product.images[0] }}
+                  />
+                </div>
+                
+                {/* Thumbnail Carousel */}
+                <div className="relative group">
+                  {/* Left Arrow */}
+                  {product.images.length > 4 && (
+                    <button 
+                      onClick={() => scroll('left')}
+                      className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-white/80 hover:bg-white p-1 rounded-full shadow-md text-gray-800 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <ArrowLeftOutlined />
+                    </button>
+                  )}
+
+                  <div 
+                    ref={scrollContainerRef}
+                    className="flex gap-2 overflow-x-auto hide-scrollbar scroll-smooth py-2 px-1"
+                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                  >
                     {product.images.map((img, idx) => (
-                      <Image
+                      <div 
                         key={idx}
-                        src={img}
-                        alt={`${product.name} - ${idx + 1}`}
-                        className="rounded cursor-pointer hover:opacity-80 transition-opacity"
-                        style={{ height: 100, objectFit: 'cover' }}
-                      />
+                        className={`flex-shrink-0 cursor-pointer border-2 rounded-md overflow-hidden transition-all duration-200 ${
+                          activeImage === img ? 'border-indigo-600 ring-1 ring-indigo-600' : 'border-transparent hover:border-gray-300'
+                        }`}
+                        onMouseEnter={() => setActiveImage(img)}
+                        style={{ width: '100px', height: '100px' }}
+                      >
+                        <img
+                          src={img}
+                          alt={`${product.name} - ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
                     ))}
                   </div>
-                </Image.PreviewGroup>
+
+                  {/* Right Arrow - We reuse ArrowLeftOutlined and rotate it or needed another icon, let's use a text or simple styled div for now if icon not available, but ArrowLeft is imported. Let's import ArrowRight if possible or just transform ArrowLeft */}
+                  {product.images.length > 4 && (
+                    <button 
+                      onClick={() => scroll('right')}
+                      className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white/80 hover:bg-white p-1 rounded-full shadow-md text-gray-800 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <ArrowLeftOutlined rotate={180} />
+                    </button>
+                  )}
+                </div>
               </div>
             </Col>
 
@@ -239,7 +292,16 @@ const ProductDetail = () => {
                   <Button
                     size="large"
                     icon={<EyeOutlined />}
-                    onClick={() => navigate(`/preview/${id}`)}
+                    onClick={() => navigate(`/preview/${id}`, {
+                      state: {
+                        breadcrumb: [
+                          { title: 'Trang chủ', path: '/' },
+                          { title: 'Sản phẩm', path: '/products' },
+                          { title: product.name, path: `/products/${id}` },
+                          { title: 'Xem mô hình 3D', path: null }
+                        ]
+                      }
+                    })}
                     block
                     style={{ height: 50 }}
                   >

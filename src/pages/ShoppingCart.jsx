@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import img1 from '../components/imgs/1.png';
+import img2 from '../components/imgs/2.png';
 
 const ShoppingCart = () => {
   const navigate = useNavigate();
   const [cartItems, setCartItems] = useState([
-    { id: 1, name: '3D Printed Vase', price: 29.99, quantity: 2, material: 'PLA' },
-    { id: 2, name: 'Custom Phone Case', price: 19.99, quantity: 1, material: 'TPU' }
+    { id: 1, name: '3D Printed Vase', price: 29.99, quantity: 2, material: 'PLA', image: img1 },
+    { id: 2, name: 'Custom Phone Case', price: 19.99, quantity: 1, material: 'TPU', image: img2 }
   ]);
 
   const updateQuantity = (id, newQuantity) => {
@@ -47,8 +49,12 @@ const ShoppingCart = () => {
           <div className="bg-white rounded-lg shadow-md overflow-hidden">
             {cartItems.map(item => (
               <div key={item.id} className="p-6 border-b border-gray-200 last:border-b-0 flex items-center gap-6">
-                <div className="bg-gray-200 w-24 h-24 rounded flex items-center justify-center text-gray-500 text-sm flex-shrink-0">
-                  Image
+                <div className="bg-gray-200 w-24 h-24 rounded overflow-hidden flex-shrink-0">
+                  <img 
+                    src={item.image} 
+                    alt={item.name}
+                    className="w-full h-full object-cover"
+                  />
                 </div>
                 <div className="flex-1">
                   <h3 className="text-xl font-semibold mb-2 text-gray-800">{item.name}</h3>

@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import img1 from '../components/imgs/1.png';
+import img2 from '../components/imgs/2.png';
 
 const CustomOrderAIGenerate = () => {
   const navigate = useNavigate();
@@ -45,12 +47,12 @@ const CustomOrderAIGenerate = () => {
 
   return (
     <div className="max-w-4xl mx-auto px-8 py-8">
-      <h1 className="text-3xl font-bold mb-8 text-gray-800">AI Generate 3D Model</h1>
+      <h1 className="text-3xl font-bold mb-8 text-gray-800">AI Tạo Mẫu 3D</h1>
 
       {!result ? (
         <form onSubmit={handleGenerate} className="bg-white rounded-lg shadow-md p-8">
           <div className="mb-6">
-            <label className="block mb-2 font-medium text-gray-800">Upload Images</label>
+            <label className="block mb-2 font-medium text-gray-800">Đăng tải Hình ảnh</label>
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-indigo-600 transition-colors">
               <input
                 type="file"
@@ -65,17 +67,21 @@ const CustomOrderAIGenerate = () => {
                 <div className="text-4xl mb-4">🤖</div>
                 <p className="text-gray-600">
                   {formData.images.length > 0 
-                    ? `${formData.images.length} image(s) selected`
-                    : 'Click to upload images for AI processing'}
+                    ? `Đã chọn ${formData.images.length} ảnh`
+                    : 'Nhấn để tải lên ảnh cho AI xử lý'}
                 </p>
-                <p className="text-sm text-gray-500 mt-2">Upload one or more reference images</p>
+                <p className="text-sm text-gray-500 mt-2">Tải lên một hoặc nhiều ảnh tham khảo</p>
               </label>
             </div>
             {formData.images.length > 0 && (
               <div className="mt-4 grid grid-cols-4 gap-4">
                 {formData.images.map((img, idx) => (
-                  <div key={idx} className="bg-gray-200 h-24 rounded flex items-center justify-center text-xs text-gray-500">
-                    {img.name}
+                  <div key={idx} className="bg-gray-200 h-24 rounded overflow-hidden">
+                    <img 
+                      src={idx % 2 === 0 ? img1 : img2} 
+                      alt={img.name}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                 ))}
               </div>
@@ -83,21 +89,21 @@ const CustomOrderAIGenerate = () => {
           </div>
 
           <div className="mb-6">
-            <label className="block mb-2 font-medium text-gray-800">Additional Prompt (Optional)</label>
+            <label className="block mb-2 font-medium text-gray-800">Mô tả thêm (Tùy chọn)</label>
             <textarea
               name="prompt"
               value={formData.prompt}
               onChange={handleChange}
               rows="4"
               className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:border-indigo-600"
-              placeholder="Add any additional instructions or preferences for the AI model generation..."
+              placeholder="Thêm hướng dẫn hoặc yêu cầu cụ thể cho việc tạo mẫu AI..."
             />
           </div>
 
           <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
             <p className="text-sm text-purple-800">
-              <strong>AI Generation:</strong> Our AI will analyze your images and generate a prototype 3D model. 
-              This is a quick preview - you can request refinements or proceed with the design.
+              <strong>Quy trình AI:</strong> AI sẽ phân tích hình ảnh của bạn và tạo ra một mô hình 3D nguyên mẫu. 
+              Đây là bản xem trước nhanh - bạn có thể yêu cầu chỉnh sửa hoặc tiến hành đặt in với mẫu này.
             </p>
           </div>
 
@@ -107,25 +113,27 @@ const CustomOrderAIGenerate = () => {
               disabled={loading}
               className="flex-1 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Generating...' : 'Generate 3D Model'}
+              {loading ? 'Đang tạo...' : 'Tạo Mô hình 3D'}
             </button>
             <button
               type="button"
               onClick={() => navigate('/custom-order')}
               className="px-6 py-3 bg-gray-200 text-gray-800 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
             >
-              Cancel
+              Hủy bỏ
             </button>
           </div>
         </form>
       ) : (
         <div className="bg-white rounded-lg shadow-md p-8">
-          <h2 className="text-2xl font-bold mb-6 text-gray-800">Generated 3D Model</h2>
+          <h2 className="text-2xl font-bold mb-6 text-gray-800">Mô hình 3D đã tạo</h2>
           
-          <div className="bg-gray-200 h-96 rounded-lg mb-6 flex items-center justify-center text-gray-500">
-            3D Model Preview
-            <br />
-            {result.preview}
+          <div className="bg-gray-200 h-96 rounded-lg mb-6 overflow-hidden">
+            <img 
+              src={img1} 
+              alt="Generated 3D Model Preview"
+              className="w-full h-full object-cover"
+            />
           </div>
 
           <div className="flex gap-4">
@@ -133,13 +141,13 @@ const CustomOrderAIGenerate = () => {
               onClick={handleUseResult}
               className="flex-1 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
             >
-              Use This Model
+              Sử dụng mẫu này
             </button>
             <button
               onClick={() => setResult(null)}
               className="px-6 py-3 bg-gray-200 text-gray-800 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
             >
-              Generate Again
+              Tạo lại
             </button>
           </div>
         </div>

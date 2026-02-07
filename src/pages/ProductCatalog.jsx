@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import img1 from '../components/imgs/1.png';
+import img2 from '../components/imgs/2.png';
 
 const ProductCatalog = () => {
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
@@ -19,6 +21,7 @@ const ProductCatalog = () => {
       material: 'PLA',
       stock: 10,
       badge: '-10%',
+      image: img1,
     },
     {
       id: 2,
@@ -28,6 +31,7 @@ const ProductCatalog = () => {
       material: 'TPU',
       stock: 25,
       badge: 'Hot',
+      image: img2,
     },
     {
       id: 3,
@@ -37,6 +41,7 @@ const ProductCatalog = () => {
       material: 'Resin',
       stock: 5,
       badge: 'New',
+      image: img1,
     },
     {
       id: 4,
@@ -46,6 +51,7 @@ const ProductCatalog = () => {
       material: 'PLA',
       stock: 18,
       badge: '-15%',
+      image: img2,
     },
     {
       id: 5,
@@ -55,6 +61,7 @@ const ProductCatalog = () => {
       material: 'PLA',
       stock: 3,
       badge: 'Limited',
+      image: img1,
     },
     {
       id: 6,
@@ -64,6 +71,7 @@ const ProductCatalog = () => {
       material: 'PLA',
       stock: 30,
       badge: 'Best seller',
+      image: img2,
     },
   ];
 
@@ -217,11 +225,15 @@ const ProductCatalog = () => {
                 }`}
               >
                 <div
-                  className={`relative bg-slate-100 flex items-center justify-center text-[11px] text-slate-400 ${
+                  className={`relative bg-slate-100 flex items-center justify-center overflow-hidden ${
                     viewMode === 'grid' ? 'aspect-[4/3]' : 'w-32 sm:w-40 md:w-48 h-28 sm:h-32'
                   }`}
                 >
-                  Hình sản phẩm
+                  <img 
+                    src={product.image} 
+                    alt={product.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
                   {product.badge && (
                     <span className="absolute left-2 top-2 rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
                       {product.badge}

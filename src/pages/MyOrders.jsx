@@ -27,7 +27,7 @@ const MyOrders = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-8 py-8">
-      <h1 className="text-3xl font-bold mb-8 text-gray-800">My Orders</h1>
+      <h1 className="text-3xl font-bold mb-8 text-gray-800">Đơn hàng của tôi</h1>
       
       <div className="mb-6 flex gap-4">
         <button
@@ -36,7 +36,7 @@ const MyOrders = () => {
             filter === 'all' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
           }`}
         >
-          All Orders
+          Tất cả
         </button>
         <button
           onClick={() => setFilter('product')}
@@ -44,7 +44,7 @@ const MyOrders = () => {
             filter === 'product' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
           }`}
         >
-          Product Orders
+          Đơn sản phẩm
         </button>
         <button
           onClick={() => setFilter('custom')}
@@ -52,25 +52,25 @@ const MyOrders = () => {
             filter === 'custom' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
           }`}
         >
-          Custom Orders
+          Đơn Custom
         </button>
       </div>
 
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         {filteredOrders.length === 0 ? (
           <div className="p-12 text-center">
-            <p className="text-gray-600 text-lg">No orders found</p>
+            <p className="text-gray-600 text-lg">Không tìm thấy đơn hàng nào</p>
           </div>
         ) : (
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Order ID</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Date</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Type</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Status</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Total</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Actions</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Mã đơn hàng</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Ngày đặt</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Loại</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Trạng thái</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Tổng tiền</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -78,10 +78,14 @@ const MyOrders = () => {
                 <tr key={order.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 text-sm font-medium text-gray-800">{order.id}</td>
                   <td className="px-6 py-4 text-sm text-gray-600">{order.date}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600 capitalize">{order.type}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600 capitalize">
+                    {order.type === 'product' ? 'Sản phẩm' : 'Custom'}
+                  </td>
                   <td className="px-6 py-4">
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
-                      {order.status.replace('_', ' ')}
+                      {order.status === 'completed' ? 'Hoàn thành' : 
+                       order.status === 'shipping' ? 'Đang vận chuyển' : 
+                       order.status === 'in_progress' ? 'Đang xử lý' : order.status}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-sm font-semibold text-gray-800">${order.total.toFixed(2)}</td>
@@ -90,7 +94,7 @@ const MyOrders = () => {
                       to={order.type === 'custom' ? `/custom-orders/${order.id}` : `/orders/${order.id}`}
                       className="text-indigo-600 hover:text-indigo-800 font-medium"
                     >
-                      View Details
+                      Xem chi tiết
                     </Link>
                   </td>
                 </tr>

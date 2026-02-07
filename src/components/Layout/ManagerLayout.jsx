@@ -45,6 +45,16 @@ const ManagerLayout = ({ children }) => {
       path: '/manager/feedback',
       label: 'Phản hồi',
       icon: '💬'
+    },
+    {
+      path: '/manager/invoices',
+      label: 'Quản lý Hóa Đơn',
+      icon: '🧾'
+    },
+    {
+      path: '/manager/transactions',
+      label: 'Quản lý Giao Dịch',
+      icon: '💰'
     }
   ];
 

@@ -258,8 +258,12 @@ const Home = () => {
               to={`/products/${item}`}
               className="group rounded-xl bg-white border border-slate-200 shadow-sm overflow-hidden no-underline flex flex-col"
             >
-              <div className="aspect-[4/3] bg-slate-100 flex items-center justify-center text-xs text-slate-400">
-                Hình sản phẩm {item}
+              <div className="aspect-[4/3] bg-slate-100 overflow-hidden">
+                <img 
+                  src={item % 2 === 0 ? img2 : img1} 
+                  alt={`Mô hình in 3D mẫu số ${item}`}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                />
               </div>
               <div className="p-3 flex-1 flex flex-col gap-1">
                 <p className="text-xs font-medium text-slate-800 group-hover:text-indigo-600 line-clamp-2">

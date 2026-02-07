@@ -22,17 +22,17 @@ const CustomOrderUpload = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     // TODO: Submit custom order
-    alert('Custom order submitted!');
+    alert('Đơn hàng custom đã được gửi!');
     navigate('/my-custom-orders');
   };
 
   return (
     <div className="max-w-4xl mx-auto px-8 py-8">
-      <h1 className="text-3xl font-bold mb-8 text-gray-800">Upload 3D File</h1>
+      <h1 className="text-3xl font-bold mb-8 text-gray-800">Đăng tải File 3D</h1>
 
       <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-md p-8">
         <div className="mb-6">
-          <label className="block mb-2 font-medium text-gray-800">3D File (STL/OBJ)</label>
+          <label className="block mb-2 font-medium text-gray-800">File 3D (STL/OBJ)</label>
           <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-indigo-600 transition-colors">
             <input
               type="file"
@@ -46,16 +46,16 @@ const CustomOrderUpload = () => {
             <label htmlFor="file-upload" className="cursor-pointer">
               <div className="text-4xl mb-4">📁</div>
               <p className="text-gray-600">
-                {formData.file ? formData.file.name : 'Click to upload or drag and drop'}
+                {formData.file ? formData.file.name : 'Nhấn để tải lên hoặc kéo thả file vào đây'}
               </p>
-              <p className="text-sm text-gray-500 mt-2">STL, OBJ files only</p>
+              <p className="text-sm text-gray-500 mt-2">Chỉ hỗ trợ file STL, OBJ</p>
             </label>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           <div>
-            <label className="block mb-2 font-medium text-gray-800">Material</label>
+            <label className="block mb-2 font-medium text-gray-800">Vật liệu</label>
             <select
               name="material"
               value={formData.material}
@@ -71,7 +71,7 @@ const CustomOrderUpload = () => {
           </div>
 
           <div>
-            <label className="block mb-2 font-medium text-gray-800">Quantity</label>
+            <label className="block mb-2 font-medium text-gray-800">Số lượng</label>
             <input
               type="number"
               name="quantity"
@@ -85,7 +85,7 @@ const CustomOrderUpload = () => {
         </div>
 
         <div className="mb-6">
-          <label className="block mb-2 font-medium text-gray-800">Service Type</label>
+          <label className="block mb-2 font-medium text-gray-800">Loại dịch vụ</label>
           <div className="space-y-3">
             <label className="flex items-center gap-3 cursor-pointer">
               <input
@@ -97,8 +97,8 @@ const CustomOrderUpload = () => {
                 className="w-5 h-5"
               />
               <div>
-                <span className="font-medium">Print Only</span>
-                <p className="text-sm text-gray-600">3D printing service only</p>
+                <span className="font-medium">Chỉ in 3D</span>
+                <p className="text-sm text-gray-600">Dịch vụ in 3D cơ bản</p>
               </div>
             </label>
             <label className="flex items-center gap-3 cursor-pointer">
@@ -111,22 +111,22 @@ const CustomOrderUpload = () => {
                 className="w-5 h-5"
               />
               <div>
-                <span className="font-medium">Print & Paint</span>
-                <p className="text-sm text-gray-600">3D printing with painting service</p>
+                <span className="font-medium">In & Sơn màu</span>
+                <p className="text-sm text-gray-600">Dịch vụ in 3D kèm hoàn thiện bề mặt và sơn màu</p>
               </div>
             </label>
           </div>
         </div>
 
         <div className="mb-6">
-          <label className="block mb-2 font-medium text-gray-800">Additional Description</label>
+          <label className="block mb-2 font-medium text-gray-800">Mô tả thêm</label>
           <textarea
             name="description"
             value={formData.description}
             onChange={handleChange}
             rows="4"
             className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:border-indigo-600"
-            placeholder="Any special requirements or notes..."
+            placeholder="Ghi chú thêm về yêu cầu của bạn (nếu có)..."
           />
         </div>
 
@@ -135,14 +135,14 @@ const CustomOrderUpload = () => {
             type="submit"
             className="flex-1 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
           >
-            Submit Order
+            Gửi đơn hàng
           </button>
           <button
             type="button"
             onClick={() => navigate('/custom-order')}
             className="px-6 py-3 bg-gray-200 text-gray-800 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
           >
-            Cancel
+            Hủy bỏ
           </button>
         </div>
       </form>
