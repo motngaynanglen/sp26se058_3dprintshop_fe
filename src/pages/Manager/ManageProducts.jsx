@@ -103,7 +103,12 @@ const ManageProducts = () => {
       });
     } catch (error) {
       console.error('Failed to fetch products', error);
-      message.error('Lỗi tải danh sách sản phẩm');
+      // Nếu lỗi 404 do endpoint chưa map method, ta log rõ hơn
+      if (error.response?.status === 404) {
+         message.error('Endpoint /api/design-variant/all không tìm thấy (404). Kiểm tra lại method hoặc path backend.');
+      } else {
+         message.error('Lỗi tải danh sách sản phẩm');
+      }
       setProducts([]);
     } finally {
       setLoading(false);
