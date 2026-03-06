@@ -32,6 +32,11 @@ export const DESIGN_TAG_ENDPOINTS = {
   SYNC: '/api/design-tag/sync',
 };
 
-// Có thể mở rộng thêm các nhóm endpoint khác (PRODUCTS, ORDERS, ...)
-
+export const DESIGN_VARIANT_ENDPOINTS = {
+  ALL: '/api/design-variant/all',
+  ADD: '/api/design-variant/add',
+  GET_DETAIL: '/api/design-variant/detail', // appending /{id}
+  UPDATE: '/api/design-variant/update', // appending /{id}
+  DELETE: '/api/design-variant/delete', // appending /{id}
+};
 
