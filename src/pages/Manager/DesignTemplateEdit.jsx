@@ -162,11 +162,11 @@ const DesignTemplateEdit = () => {
     setLoading(true);
     try {
       const payload = {
-        code: values.code,
-        name: values.name,
-        fileUrl: values.fileUrl || null,
-        thumbnailUrl: values.thumbnailUrl || null,
-        description: description,
+        code: values.code || "",
+        name: values.name || "",
+        fileUrl: values.fileUrl || "", // Đổi null thành "" để khớp type string của backend
+        thumbnailUrl: values.thumbnailUrl || "", // Đổi null thành "" để khớp type string của backend
+        description: description || "",
       };
 
       if (isEditMode) {
