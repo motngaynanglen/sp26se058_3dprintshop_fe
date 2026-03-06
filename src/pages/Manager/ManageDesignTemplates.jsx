@@ -15,25 +15,22 @@ const ManageDesignTemplates = () => {
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
-  const [statusFilter, setStatusFilter] = useState(null); // null = all, true = active, false = deactive
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: 10,
     total: 0,
   });
 
-  const fetchTemplates = async (page = 1, search = searchText, status = statusFilter) => {
+  const fetchTemplates = async (page = 1, search = searchText) => {
     setLoading(true);
     try {
       const params = {
-        search: search || '',
-        isActive: status === null ? null : (status ? 'Active' : 'Deactive'),
-        sort: 'desc',
-        sortBy: 'createdAt',
-        paging: {
-          pageIndex: page,
-          pageSize: pagination.pageSize,
-        },
+        pageNumber: page,
+        pageSize: pagination.pageSize,
+        search: search || "",
+        isActive: true, // Swagger required true/false boolean, null caused 400
+        sortDescending: true,
+        sortBy: "createdAt" // Add a default sort string to avoid null
       };
       
       const response = await designTemplateApi.query(params);
@@ -45,25 +42,8 @@ const ManageDesignTemplates = () => {
       });
     } catch (error) {
       console.error('Failed to fetch templates', error);
-      // Mock data for development
-      setTemplates([
-        {
-          id: '1',
-          code: 'MS-2026-001',
-          name: 'Mô hình rồng 3D',
-          thumbnailUrl: 'https://via.placeholder.com/50',
-          isActive: true,
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: '2',
-          code: 'MS-2026-002',
-          name: 'Mô hình phi hành gia',
-          thumbnailUrl: 'https://via.placeholder.com/50',
-          isActive: false,
-          createdAt: new Date().toISOString(),
-        },
-      ]);
+      message.error('Lỗi tải danh sách Design Template từ máy chủ.');
+      setTemplates([]);
     } finally {
       setLoading(false);
     }
@@ -75,13 +55,7 @@ const ManageDesignTemplates = () => {
 
   const handleSearch = (value) => {
     setSearchText(value);
-    fetchTemplates(1, value, statusFilter);
-  };
-
-  const handleStatusChange = (value) => {
-    const status = value === 'all' ? null : value === 'active';
-    setStatusFilter(status);
-    fetchTemplates(1, searchText, status);
+    fetchTemplates(1, value);
   };
 
   const handleTableChange = (newPagination) => {
@@ -244,17 +218,6 @@ const ManageDesignTemplates = () => {
             onChange={(e) => !e.target.value && handleSearch('')}
             style={{ flex: 1 }}
           />
-          <Select
-            placeholder="Trạng thái"
-            size="large"
-            style={{ width: 200 }}
-            onChange={handleStatusChange}
-            defaultValue="all"
-          >
-            <Option value="all">Tất cả</Option>
-            <Option value="active">Active</Option>
-            <Option value="deactive">Deactive</Option>
-          </Select>
         </div>
       </div>
 

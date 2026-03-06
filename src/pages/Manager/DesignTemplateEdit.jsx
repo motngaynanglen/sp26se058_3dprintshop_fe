@@ -172,28 +172,27 @@ const DesignTemplateEdit = () => {
     setLoading(true);
     try {
       const payload = {
-        ...values,
+        code: values.code,
+        name: values.name,
+        fileUrl: values.fileUrl,
+        thumbnailUrl: values.thumbnailUrl,
         description: description,
       };
 
-      let response;
       if (isEditMode) {
-        response = await designTemplateApi.update(id, payload);
+        await designTemplateApi.update(id, payload);
       } else {
-        response = await designTemplateApi.add(payload);
+        await designTemplateApi.add(payload);
       }
 
-      if (response.code === 'SUCCESS') {
-        if (isEditMode && id) {
-          await syncTags();
-          // Mock save variants logic here
-          console.log('Saving variants:', variants);
-        }
-        message.success(isEditMode ? 'Cập nhật thành công' : 'Thêm mới thành công');
-        navigate('/manager/design-templates');
-      } else {
-        message.error(response.message || 'Thao tác thất bại');
+      // Xử lý logic tag và variant khi update
+      if (isEditMode && id) {
+        await syncTags();
+        console.log('Saving variants:', variants);
       }
+      message.success(isEditMode ? 'Cập nhật thành công' : 'Thêm mới thành công');
+      navigate('/manager/design-templates');
+
     } catch (error) {
       const errorMsg = error.response?.data?.message || 'Thao tác thất bại';
       message.error(errorMsg);
