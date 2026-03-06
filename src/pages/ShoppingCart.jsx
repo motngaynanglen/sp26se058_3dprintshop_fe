@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import img1 from '../components/imgs/1.png';
-import img2 from '../components/imgs/2.png';
+import { useCart } from '../contexts/CartContext';
 
 // SVG Icons
 const TrashIcon = () => (
@@ -70,38 +69,20 @@ const StatusBadge = ({ sourceType }) => {
 
 const ShoppingCart = () => {
   const navigate = useNavigate();
-  const [cartItems, setCartItems] = useState([
-    { id: 1, name: 'Bình hoa in 3D – Phong cách Bắc Âu', price: 299000, quantity: 2, material: 'PLA', image: img1, sourceType: 'in_stock' },
-    { id: 2, name: 'Ốp lưng điện thoại Custom', price: 199000, quantity: 1, material: 'TPU', image: img2, sourceType: 'pre_order', estimatedDays: 3 },
-    { id: 3, name: 'Mô hình game theo yêu cầu', price: 850000, quantity: 1, material: 'Resin', image: img1, sourceType: 'custom' },
-  ]);
+  const { items, updateQuantity, removeFromCart, subtotal } = useCart();
 
-  const updateQuantity = (id, newQuantity) => {
-    if (newQuantity <= 0) {
-      setCartItems(cartItems.filter(item => item.id !== id));
-    } else {
-      setCartItems(cartItems.map(item =>
-        item.id === id ? { ...item, quantity: newQuantity } : item
-      ));
-    }
-  };
-
-  const removeItem = (id) => {
-    setCartItems(cartItems.filter(item => item.id !== id));
-  };
-
-  const hasPreOrder = cartItems.some(i => i.sourceType === 'pre_order');
-  const hasCustom = cartItems.some(i => i.sourceType === 'custom');
+  const hasPreOrder = items.some(i => i.product.sourceType === 'pre_order');
+  const hasCustom = items.some(i => i.product.sourceType === 'custom');
   const showDeliveryWarning = hasPreOrder || hasCustom;
 
-  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const shipping = 30000;
+  // Fix 30k shipping by default if cart has items
+  const shipping = items.length > 0 ? 30000 : 0;
   const total = subtotal + shipping;
 
   const formatPrice = (price) =>
     new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
 
-  if (cartItems.length === 0) {
+  if (items.length === 0) {
     return (
       <div className="max-w-7xl mx-auto px-6 py-20 text-center">
         <div className="flex flex-col items-center gap-4">
@@ -112,7 +93,7 @@ const ShoppingCart = () => {
           <p className="text-gray-500">Thêm sản phẩm vào giỏ để bắt đầu mua sắm!</p>
           <Link
             to="/products"
-            className="mt-4 inline-flex items-center gap-2 py-3 px-6 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition-colors duration-200 cursor-pointer"
+            className="mt-4 inline-flex items-center gap-2 py-3 px-6 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition-colors duration-200 cursor-pointer no-underline"
           >
             Khám phá sản phẩm
           </Link>
@@ -125,32 +106,44 @@ const ShoppingCart = () => {
     <div className="max-w-7xl mx-auto px-6 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Giỏ hàng</h1>
-        <p className="text-gray-500 mt-1">{cartItems.length} sản phẩm trong giỏ</p>
+        <p className="text-gray-500 mt-1">{items.length} sản phẩm trong giỏ</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Cart Items */}
         <div className="lg:col-span-2 space-y-4">
-          {cartItems.map(item => (
+          {items.map((item, idx) => (
             <div
-              key={item.id}
+              key={`${item.product.id}-${item.material}-${idx}`}
               className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-start gap-4 hover:shadow-md transition-shadow duration-200"
             >
-              <div className="w-24 h-24 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
-                <img
-                  src={item.image}
-                  alt={item.name}
-                  className="w-full h-full object-cover"
-                />
+              <div className="w-24 h-24 rounded-xl overflow-hidden bg-slate-50 flex-shrink-0 relative">
+                {/* Dùng model-viewer hoặc image tĩnh tuỳ data, nếu có modelSrc dùng model-viewer (camera-controls false để ko bị nhiễu) */}
+                {item.product.modelSrc ? (
+                  <model-viewer
+                    src={item.product.modelSrc}
+                    auto-rotate
+                    shadow-intensity="0.8"
+                    environment-image="neutral"
+                    interaction-prompt="none"
+                    style={{ width: '100%', height: '100%', pointerEvents: 'none' }}
+                  />
+                ) : (
+                  <img
+                    src={item.product.image}
+                    alt={item.product.name}
+                    className="w-full h-full object-cover"
+                  />
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div>
-                    <h3 className="font-semibold text-gray-900 text-sm leading-snug">{item.name}</h3>
+                    <h3 className="font-semibold text-gray-900 text-sm leading-snug">{item.product.name}</h3>
                     <p className="text-xs text-gray-500 mt-0.5">Vật liệu: {item.material}</p>
                   </div>
                   <button
-                    onClick={() => removeItem(item.id)}
+                    onClick={() => removeFromCart(item.product.id, item.material)}
                     className="text-gray-400 hover:text-red-500 transition-colors duration-150 cursor-pointer flex-shrink-0 p-1"
                     aria-label="Xoá sản phẩm"
                   >
@@ -158,12 +151,12 @@ const ShoppingCart = () => {
                   </button>
                 </div>
                 <div className="mb-3">
-                  <StatusBadge sourceType={item.sourceType} />
+                  <StatusBadge sourceType={item.product.sourceType} />
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1">
                     <button
-                      onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                      onClick={() => updateQuantity(item.product.id, item.material, item.quantity - 1)}
                       className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all duration-150 cursor-pointer font-medium"
                       aria-label="Giảm số lượng"
                     >
@@ -173,7 +166,7 @@ const ShoppingCart = () => {
                       {item.quantity}
                     </span>
                     <button
-                      onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                      onClick={() => updateQuantity(item.product.id, item.material, item.quantity + 1)}
                       className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all duration-150 cursor-pointer font-medium"
                       aria-label="Tăng số lượng"
                     >
@@ -181,7 +174,7 @@ const ShoppingCart = () => {
                     </button>
                   </div>
                   <p className="font-bold text-indigo-600 text-sm">
-                    {formatPrice(item.price * item.quantity)}
+                    {formatPrice(item.product.price * item.quantity)}
                   </p>
                 </div>
               </div>
@@ -196,14 +189,16 @@ const ShoppingCart = () => {
 
             {/* Item type legend */}
             <div className="space-y-2 pb-4 border-b border-gray-100">
-              {cartItems.map(item => (
-                <div key={item.id} className="flex justify-between items-center text-sm">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="truncate text-gray-700 max-w-[140px]">{item.name}</span>
-                    <StatusBadge sourceType={item.sourceType} />
+              {items.map((item, idx) => (
+                <div key={`${item.product.id}-${item.material}-${idx}`} className="flex justify-between items-center text-sm">
+                  <div className="flex items-center gap-2 min-w-0 max-w-[65%]">
+                    <span className="truncate text-gray-700">{item.product.name}</span>
+                    <div className="scale-75 origin-left hidden xl:block">
+                      <StatusBadge sourceType={item.product.sourceType} />
+                    </div>
                   </div>
                   <span className="font-medium text-gray-900 flex-shrink-0 ml-2">
-                    {formatPrice(item.price * item.quantity)}
+                    {formatPrice(item.product.price * item.quantity)}
                   </span>
                 </div>
               ))}
@@ -244,7 +239,7 @@ const ShoppingCart = () => {
             </button>
             <Link
               to="/products"
-              className="block w-full py-3 text-center bg-gray-50 text-gray-700 rounded-xl font-medium text-sm hover:bg-gray-100 transition-colors duration-200 cursor-pointer border border-gray-200"
+              className="block w-full py-3 text-center bg-gray-50 text-gray-700 rounded-xl font-medium text-sm hover:bg-gray-100 transition-colors duration-200 cursor-pointer border border-gray-200 no-underline"
             >
               Tiếp tục mua sắm
             </Link>

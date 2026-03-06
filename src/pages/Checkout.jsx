@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useCart } from '../contexts/CartContext';
+import { useOrder } from '../contexts/OrderContext';
 import img1 from '../components/imgs/1.png';
 import img2 from '../components/imgs/2.png';
 
@@ -69,23 +71,33 @@ const Checkout = () => {
     paymentMethod: 'vnpay',
   });
 
-  // Mock cart items with source types
-  const cartItems = [
-    { id: 1, name: 'Bình hoa in 3D', price: 299000, quantity: 2, material: 'PLA', image: img1, sourceType: 'in_stock' },
-    { id: 2, name: 'Ốp lưng điện thoại Custom', price: 199000, quantity: 1, material: 'TPU', image: img2, sourceType: 'pre_order' },
-  ];
+  const { items, subtotal, clearCart } = useCart();
+  const { addOrder } = useOrder();
 
-  const hasPreOrder = cartItems.some(i => i.sourceType === 'pre_order');
-  const hasCustom = cartItems.some(i => i.sourceType === 'custom');
+  const hasPreOrder = items.some(i => i.product.sourceType === 'pre_order');
+  const hasCustom = items.some(i => i.product.sourceType === 'custom');
   const showDeliveryWarning = hasPreOrder || hasCustom;
 
-  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const shipping = 30000;
+  const shipping = items.length > 0 ? 30000 : 0;
   const tax = Math.round(subtotal * 0.08);
   const total = subtotal + shipping + tax;
 
   const formatPrice = (price) =>
     new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
+
+  if (items.length === 0) {
+    return (
+      <div className="max-w-7xl mx-auto px-6 py-20 text-center">
+        <h1 className="text-2xl font-bold text-gray-800 mb-4">Bạn chưa chọn sản phẩm nào để thanh toán</h1>
+        <button
+          onClick={() => navigate('/cart')}
+          className="inline-flex items-center gap-2 py-3 px-6 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition"
+        >
+          Trở lại giỏ hàng
+        </button>
+      </div>
+    );
+  }
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -93,7 +105,36 @@ const Checkout = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    navigate('/order-confirmation', { state: { orderId: 'ORD-' + Date.now() } });
+    const orderId = 'ORD-' + Date.now();
+    const newOrder = {
+      id: orderId,
+      date: new Intl.DateTimeFormat('vi-VN').format(new Date()),
+      status: 'created',
+      shipping,
+      tax,
+      subtotal,
+      total,
+      type: hasCustom ? 'custom' : 'product',
+      items: items.map(i => ({
+        name: i.product.name,
+        quantity: i.quantity,
+        price: i.product.price,
+        material: i.material,
+        image: i.product.image,
+        modelSrc: i.product.modelSrc,
+        sourceType: i.product.sourceType,
+        fulfillmentStatus: 'pending'
+      })),
+      shippingInfo: {
+        name: formData.fullName,
+        address: formData.addressLine + ', ' + formData.ward + ', ' + formData.district + ', ' + formData.city,
+        phone: formData.phone
+      }
+    };
+    
+    addOrder(newOrder);
+    clearCart();
+    navigate('/order-confirmation', { state: { orderId } });
   };
 
   return (
@@ -261,20 +302,31 @@ const Checkout = () => {
 
             {/* Items list */}
             <div className="space-y-3 pb-4 border-b border-gray-100">
-              {cartItems.map(item => (
-                <div key={item.id} className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                    <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+              {items.map((item, idx) => (
+                <div key={`${item.product.id}-${item.material}-${idx}`} className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-lg overflow-hidden bg-slate-50 flex-shrink-0 relative">
+                    {item.product.modelSrc ? (
+                      <model-viewer
+                        src={item.product.modelSrc}
+                        camera-controls={false}
+                        auto-rotate
+                        interaction-prompt="none"
+                        shadow-intensity="1"
+                        style={{ width: '100%', height: '100%', pointerEvents: 'none' }}
+                      />
+                    ) : (
+                      <img src={item.product.image} alt={item.product.name} className="w-full h-full object-cover" />
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-gray-800 truncate">{item.name}</p>
+                    <p className="text-xs font-medium text-gray-800 truncate">{item.product.name}</p>
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      <StatusBadge sourceType={item.sourceType} />
+                      <StatusBadge sourceType={item.product.sourceType} />
                       <span className="text-xs text-gray-400">x{item.quantity}</span>
                     </div>
                   </div>
                   <span className="text-xs font-semibold text-gray-900 flex-shrink-0">
-                    {formatPrice(item.price * item.quantity)}
+                    {formatPrice(item.product.price * item.quantity)}
                   </span>
                 </div>
               ))}

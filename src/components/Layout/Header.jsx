@@ -5,13 +5,20 @@ import { ShoppingCartOutlined, SearchOutlined, UserOutlined, DownOutlined, Unord
 import { useAuth } from '../../contexts/AuthContext';
 import { useAuthModal } from '../../contexts/AuthModalContext';
 
+import { useCart } from '../../contexts/CartContext';
+
 const Header = () => {
   const { user, logout, isAuthenticated } = useAuth();
   const { openModal } = useAuthModal();
+  const { totalItems } = useCart();
   const navigate = useNavigate();
   const location = useLocation();
   const screens = Grid.useBreakpoint();
   const [q, setQ] = useState('');
+// ... (skip lines to reach badge)
+// Thay vì dùng `0`, dùng `totalItems`
+// Tôi sẽ tìm function header ở StartLine 8 và render ở dưới
+
 
   const handleLogout = () => {
     logout();
@@ -120,7 +127,7 @@ const Header = () => {
           </div>
 
           <Space size={12} align="center" wrap style={{ justifyContent: 'flex-end' }}>
-            <Badge count={0} size="small">
+            <Badge count={totalItems} size="small" showZero={false}>
               <Button
                 type="default"
                 icon={<ShoppingCartOutlined />}

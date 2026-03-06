@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useOrder } from '../contexts/OrderContext';
+
 
 // SVG Icons
 const PackageIcon = ({ className = "w-4 h-4" }) => (
@@ -99,18 +101,7 @@ const FILTERS = [
 
 const MyOrders = () => {
   const [filter, setFilter] = useState('all');
-
-  // Mock data sử dụng đúng OrderStatus từ backend
-  const orders = [
-    { id: 'ORD-001', date: '15/01/2024', status: 'completed', total: 797000, type: 'product' },
-    { id: 'ORD-002', date: '12/01/2024', status: 'shipping', total: 299000, type: 'product' },
-    { id: 'ORD-003', date: '10/01/2024', status: 'processing', total: 498000, type: 'product' },
-    { id: 'ORD-004', date: '09/01/2024', status: 'confirmed', total: 650000, type: 'product' },
-    { id: 'CUST-001', date: '08/01/2024', status: 'processing', total: 1500000, type: 'custom' },
-    { id: 'ORD-005', date: '05/01/2024', status: 'created', total: 350000, type: 'product' },
-    { id: 'CUST-002', date: '02/01/2024', status: 'completed', total: 1800000, type: 'custom' },
-    { id: 'ORD-006', date: '01/01/2024', status: 'failed', total: 250000, type: 'product' },
-  ];
+  const { orders } = useOrder();
 
   const activeFilter = FILTERS.find(f => f.value === filter);
   const filteredOrders = orders.filter(activeFilter.filterFn);

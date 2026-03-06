@@ -1,6 +1,7 @@
 import React from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Breadcrumb } from 'antd';
+import { useOrder } from '../contexts/OrderContext';
 
 // SVG Icons
 const DocumentIcon = () => (
@@ -77,21 +78,30 @@ const CustomOrderDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
 
+  const { getOrderById } = useOrder();
+  const baseOrder = getOrderById(id);
+
+  if (!baseOrder) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 px-4">
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">Đơn hàng Custom không tồn tại</h2>
+        <p className="text-gray-500 mb-6">Chúng tôi không tìm thấy thông tin đơn hàng này.</p>
+        <Link to="/my-orders" className="text-indigo-600 font-medium hover:underline">
+          Quay lại danh sách Đơn hàng
+        </Link>
+      </div>
+    );
+  }
+
   const order = {
-    id,
+    ...baseOrder,
     type: 'upload',
-    date: '15/01/2024',
-    status: 'pending_approval',
-    material: 'Resin',
-    quantity: 2,
+    material: baseOrder.items?.[0]?.material || 'Resin',
+    quantity: baseOrder.items?.[0]?.quantity || 1,
     serviceType: 'print_paint',
     description: 'Thiết kế mô hình nhân vật game theo yêu cầu riêng, sơn màu tùy chỉnh, đế trưng bày có khắc tên.',
-    total: 1500000,
-    subtotal: 1300000,
-    tax: 104000,
-    shipping: 96000,
     technicalDraft: {
-      material: 'Resin',
+      material: baseOrder.items?.[0]?.material || 'Resin',
       infillDensity: 85,
       layerHeight: 0.05,
       estimatedWeight: 320,
@@ -100,8 +110,7 @@ const CustomOrderDetail = () => {
       note: 'Cần hỗ trợ ở phần cánh tay và bệ đặt. Hướng in nghiêng 45° để tối ưu độ bền.',
     },
     files: [
-      { name: 'character_v2.stl', version: 2, isPreview: true, isPrintable: true },
-      { name: 'character_v1.stl', version: 1, isPreview: false, isPrintable: false },
+      { name: baseOrder.items?.[0]?.name || 'character_v2.stl', version: 2, isPreview: true, isPrintable: true },
     ],
   };
 

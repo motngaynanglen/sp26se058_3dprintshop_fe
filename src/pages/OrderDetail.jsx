@@ -1,6 +1,7 @@
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Breadcrumb } from 'antd';
+import { useOrder } from '../contexts/OrderContext';
 import img1 from '../components/imgs/1.png';
 import img2 from '../components/imgs/2.png';
 
@@ -171,42 +172,20 @@ const buildTrackingSteps = (orderStatus, hasPreOrder) => {
 const OrderDetail = () => {
   const { id } = useParams();
 
-  const order = {
-    id,
-    date: '15/01/2024',
-    status: 'completed',           // OrderStatus từ backend
-    estimatedDelivery: '20/01/2024',
-    total: 797000,
-    shipping: 30000,
-    tax: 59760,
-    subtotal: 707240,
-    items: [
-      {
-        name: 'Bình hoa in 3D – Phong cách Bắc Âu',
-        quantity: 2,
-        price: 299000,
-        material: 'PLA',
-        image: img1,
-        sourceType: 'in_stock',
-        fulfillmentStatus: 'delivered',   // FulfillmentStatus từ backend
-      },
-      {
-        name: 'Ốp lưng điện thoại Custom',
-        quantity: 1,
-        price: 199000,
-        material: 'TPU',
-        image: img2,
-        sourceType: 'pre_order',
-        fulfillmentStatus: 'delivered',
-      },
-    ],
-    shippingInfo: {
-      name: 'Nguyễn Văn A',
-      address: '123 Đường Lê Lợi, Phường Bến Nghé',
-      city: 'Quận 1, Hồ Chí Minh',
-      phone: '+84 901 234 567',
-    },
-  };
+  const { getOrderById } = useOrder();
+  const order = getOrderById(id);
+
+  if (!order) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 px-4">
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">Đơn hàng không tồn tại</h2>
+        <p className="text-gray-500 mb-6">Chúng tôi không tìm thấy thông tin đơn hàng này.</p>
+        <Link to="/my-orders" className="text-indigo-600 font-medium hover:underline">
+          Quay lại danh sách Đơn hàng
+        </Link>
+      </div>
+    );
+  }
 
   const hasPreOrder = order.items.some(i => i.sourceType === 'pre_order');
   const hasCustom = order.items.some(i => i.sourceType === 'custom');

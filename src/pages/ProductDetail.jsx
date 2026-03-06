@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import img1 from '../components/imgs/1.png';
-import img2 from '../components/imgs/2.png';
+import { useCart } from '../contexts/CartContext';
+import { getProductById } from '../data/products';
 import {
   Button,
   InputNumber,
@@ -16,7 +16,8 @@ import {
   Row,
   Col,
   Image,
-  Tooltip
+  Tooltip,
+  notification
 } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -25,6 +26,7 @@ import {
   InfoCircleOutlined,
   CheckCircleOutlined
 } from '@ant-design/icons';
+import '@google/model-viewer';
 
 const { Option } = Select;
 
@@ -33,7 +35,9 @@ const ProductDetail = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated, isCustomer, isManager, isAdmin, isEmployee } = useAuth();
+  const { addToCart } = useCart();
   
+  const [product, setProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [selectedMaterial, setSelectedMaterial] = useState('PLA');
 
@@ -41,41 +45,17 @@ const ProductDetail = () => {
   const fromFeedback = location.state?.from === 'feedback';
   const previousPath = location.state?.previousPath || '/products';
 
-  // Mock product data - Enhanced
-  const product = {
-    id: id,
-    name: 'Mô hình 3D Custom Logo Công ty',
-    price: 500000,
-    description: 'Sản phẩm rất đẹp, chất lượng in tốt, màu sắc chuẩn. Phù hợp để làm quà tặng doanh nghiệp hoặc trang trí văn phòng.',
-    materials: ['PLA', 'ABS', 'TPU', 'Wood PLA', 'PETG'],
-    stock: 10,
-    rating: 4.5,
-    reviewCount: 24,
-    images: [
-      img1,
-      img2,
-      img1,
-      img2,
-      img1,
-      img2,
-      img1
-    ],
-    specifications: {
-      dimensions: '20 x 20 x 15 cm',
-      weight: '250g',
-      printTime: '12 giờ',
-      layerHeight: '0.2mm',
-      infill: '20%',
-      color: 'Đỏ'
-    },
-    features: [
-      'In 3D chất lượng cao',
-      'Màu sắc bền đẹp',
-      'Có thể tùy chỉnh theo yêu cầu',
-      'Giao hàng nhanh chóng',
-      'Bảo hành 6 tháng'
-    ]
-  };
+  useEffect(() => {
+    const foundProduct = getProductById(id);
+    if (foundProduct) {
+      setProduct(foundProduct);
+      if (foundProduct.materials?.length > 0) {
+        setSelectedMaterial(foundProduct.materials[0]);
+      }
+    } else {
+      // Handle not found (could redirect or show skeleton)
+    }
+  }, [id]);
 
   const handleGoBack = () => {
     if (fromFeedback) {
@@ -92,34 +72,20 @@ const ProductDetail = () => {
       navigate('/login');
       return;
     }
-    // TODO: Add to cart logic
-    alert(`Đã thêm ${quantity} sản phẩm vào giỏ hàng!`);
+    addToCart(product, quantity, selectedMaterial);
+    notification.success({
+      message: 'Đã thêm vào giỏ hàng',
+      description: `Thêm ${quantity} sản phẩm "${product.name}" với vật liệu ${selectedMaterial} thành công.`,
+      placement: 'bottomRight'
+    });
   };
 
   // Determine if should show Add to Cart
   const showAddToCart = isCustomer;
 
-  const [activeImage, setActiveImage] = useState(null);
-  const scrollContainerRef = React.useRef(null);
-
-  // Set default active image
-  React.useEffect(() => {
-    if (product.images && product.images.length > 0) {
-      setActiveImage(product.images[0]);
-    }
-  }, [id]); // Reset when id changes
-
-  const scroll = (direction) => {
-    if (scrollContainerRef.current) {
-      const { current } = scrollContainerRef;
-      const scrollAmount = 100; // Adjust scroll amount
-      if (direction === 'left') {
-        current.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
-      } else {
-        current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
-      }
-    }
-  };
+  if (!product) {
+    return <div className="min-h-screen flex items-center justify-center font-medium text-slate-500">Đang tải dữ liệu sản phẩm...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -142,59 +108,30 @@ const ProductDetail = () => {
             {/* Image Gallery - Sticky & Enhanced */}
             <Col xs={24} lg={12}>
               <div className="sticky top-24">
-                <div className="mb-4 overflow-hidden rounded-lg border border-gray-200">
-                  <Image
-                    src={activeImage || product.images[0]}
-                    alt={product.name}
-                    className="w-full object-contain bg-white"
-                    style={{ maxHeight: '600px', height: '500px', width: '100%' }} // Increased size
-                    preview={{ src: activeImage || product.images[0] }}
-                  />
-                </div>
-                
-                {/* Thumbnail Carousel */}
-                <div className="relative group">
-                  {/* Left Arrow */}
-                  {product.images.length > 4 && (
-                    <button 
-                      onClick={() => scroll('left')}
-                      className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-white/80 hover:bg-white p-1 rounded-full shadow-md text-gray-800 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <ArrowLeftOutlined />
-                    </button>
+                {/* Switch between 3D Model and Image */}
+                <div className="mb-4 overflow-hidden rounded-xl border border-gray-200 bg-slate-50 relative aspect-square w-full">
+                  {product.modelSrc ? (
+                    <model-viewer
+                      src={product.modelSrc}
+                      camera-controls
+                      auto-rotate
+                      shadow-intensity="1"
+                      environment-image="neutral"
+                      exposure="1.2"
+                      style={{ width: '100%', height: '100%', backgroundColor: '#f8fafc' }}
+                    />
+                  ) : (
+                    <Image
+                      src={activeImage || product.images?.[0]}
+                      alt={product.name}
+                      className="w-full h-full object-contain"
+                      preview={{ src: activeImage || product.images?.[0] }}
+                    />
                   )}
-
-                  <div 
-                    ref={scrollContainerRef}
-                    className="flex gap-2 overflow-x-auto hide-scrollbar scroll-smooth py-2 px-1"
-                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                  >
-                    {product.images.map((img, idx) => (
-                      <div 
-                        key={idx}
-                        className={`flex-shrink-0 cursor-pointer border-2 rounded-md overflow-hidden transition-all duration-200 ${
-                          activeImage === img ? 'border-indigo-600 ring-1 ring-indigo-600' : 'border-transparent hover:border-gray-300'
-                        }`}
-                        onMouseEnter={() => setActiveImage(img)}
-                        style={{ width: '100px', height: '100px' }}
-                      >
-                        <img
-                          src={img}
-                          alt={`${product.name} - ${idx + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Right Arrow - We reuse ArrowLeftOutlined and rotate it or needed another icon, let's use a text or simple styled div for now if icon not available, but ArrowLeft is imported. Let's import ArrowRight if possible or just transform ArrowLeft */}
-                  {product.images.length > 4 && (
-                    <button 
-                      onClick={() => scroll('right')}
-                      className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white/80 hover:bg-white p-1 rounded-full shadow-md text-gray-800 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <ArrowLeftOutlined rotate={180} />
-                    </button>
+                  {product.modelSrc && (
+                    <div className="absolute top-3 right-3 bg-indigo-600 text-white text-[11px] font-semibold px-2 py-1 rounded-full shadow-sm">
+                      3D Interactive
+                    </div>
                   )}
                 </div>
               </div>

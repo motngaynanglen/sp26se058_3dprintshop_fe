@@ -6,6 +6,7 @@ export const AUTH_ENDPOINTS = {
 };
 
 export const MATERIAL_ENDPOINTS = {
+  GET_ALL: '/api/material/all',
   QUERY: '/api/material/query',
   ADD: '/api/material/add',
   UPDATE_PRICE: '/api/material/update-price',
