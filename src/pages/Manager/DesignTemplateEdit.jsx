@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Form, Input, Button, Switch, message, Card, Row, Col, Modal, Select, Tag, Table, InputNumber, Space 
+  Form, Input, Button, Switch, message, Card, Row, Col, Modal, Select, Tag, Table, InputNumber, Space, Upload 
 } from 'antd';
 import { StarOutlined, StarFilled, CloseOutlined, PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -144,16 +144,6 @@ const DesignTemplateEdit = () => {
   };
 
   const handleSubmit = async (values) => {
-    // Validate file URLs
-    if (!validateFileUrl(values.fileUrl, ['.stl', '.obj', '.3mf'])) {
-      message.error('File 3D phải có đuôi .stl, .obj hoặc .3mf');
-      return;
-    }
-    if (values.thumbnailUrl && !validateFileUrl(values.thumbnailUrl, ['.jpg', '.png', '.webp'])) {
-      message.error('Ảnh đại diện phải có đuôi .jpg, .png hoặc .webp');
-      return;
-    }
-
     if (isEditMode && originalData?.isActive && !values.isActive) {
       Modal.confirm({
         title: 'Xác nhận Deactive',
@@ -174,8 +164,8 @@ const DesignTemplateEdit = () => {
       const payload = {
         code: values.code,
         name: values.name,
-        fileUrl: values.fileUrl,
-        thumbnailUrl: values.thumbnailUrl,
+        fileUrl: values.fileUrl || null,
+        thumbnailUrl: values.thumbnailUrl || null,
         description: description,
       };
 
@@ -405,19 +395,42 @@ const DesignTemplateEdit = () => {
             />
           </Form.Item>
 
-          <Form.Item name="fileUrl" label="File 3D URL" rules={[{ required: true }]}>
-            <Input />
+          <Form.Item name="fileUrl" label="File 3D URL (Tạm thời có thể bỏ trống)">
+            <Input placeholder="Nhập URL file .stl, .obj nếu có" />
           </Form.Item>
 
-          <Form.Item name="thumbnailUrl" label="Ảnh đại diện URL">
-            <Input onChange={handleThumbnailChange} />
+          <Form.Item label="Ảnh đại diện">
+            <Upload
+              listType="picture-card"
+              showUploadList={false}
+              beforeUpload={(file) => {
+                const isLt2M = file.size / 1024 / 1024 < 2;
+                if (!isLt2M) {
+                  message.error('Ảnh phải nhỏ hơn 2MB!');
+                  return false;
+                }
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                  setThumbnailPreview(e.target.result);
+                  form.setFieldsValue({ thumbnailUrl: e.target.result });
+                };
+                reader.readAsDataURL(file);
+                return false; // Chặn upload tự động lên server
+              }}
+            >
+              {thumbnailPreview ? (
+                <img src={thumbnailPreview} alt="thumbnail" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <div>
+                  <PlusOutlined />
+                  <div style={{ marginTop: 8 }}>Chọn ảnh</div>
+                </div>
+              )}
+            </Upload>
+            <Form.Item name="thumbnailUrl" noStyle>
+              <Input type="hidden" />
+            </Form.Item>
           </Form.Item>
-
-          {thumbnailPreview && (
-            <div className="mb-4">
-              <img src={thumbnailPreview} alt="Preview" className="w-32 h-32 object-cover rounded border" />
-            </div>
-          )}
 
           <Form.Item name="isActive" label="Trạng thái" valuePropName="checked">
             <Switch checkedChildren="Active" unCheckedChildren="Deactive" />
