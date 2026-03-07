@@ -76,8 +76,8 @@ const ManageProducts = () => {
         materialApi.getAll(),
         designTemplateApi.query({ pageNumber: 1, pageSize: 100, isActive: true })
       ]);
-      setMaterials(materialsRes.data || []);
-      setDesignTemplates(templatesRes.data || []);
+      setMaterials(Array.isArray(materialsRes) ? materialsRes : (materialsRes?.data || []));
+      setDesignTemplates(Array.isArray(templatesRes) ? templatesRes : (templatesRes?.data || []));
     } catch (error) {
       console.error('Failed to fetch initial data', error);
       message.error('Không thể tải danh sách vật liệu hoặc mẫu thiết kế');
@@ -101,11 +101,14 @@ const ManageProducts = () => {
       if (matId) params.materialId = matId;
       
       const response = await designVariantApi.getAll(params);
-      setProducts(response.data || []);
+      // Backend thường trả về { data: [...] } hoặc trực tiếp [...]
+      const productList = Array.isArray(response) ? response : (response?.data || []);
+      setProducts(productList);
+      
       setPagination({
         ...pagination,
         current: page,
-        total: response.additionalData?.paging?.totalCount || 0,
+        total: response?.additionalData?.paging?.totalCount || productList.length,
       });
     } catch (error) {
       console.error('Failed to fetch products', error);
