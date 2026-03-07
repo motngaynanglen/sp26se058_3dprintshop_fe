@@ -4,8 +4,8 @@ import { DESIGN_VARIANT_ENDPOINTS } from './endpoints';
 const designVariantApi = {
   // Query all variants with filtering and paging
   getAll: (params) => {
-    // Dựa trên lỗi 405 khi dùng POST, endpoint này yêu cầu dùng GET với query parameters.
-    return axiosInstance.get(DESIGN_VARIANT_ENDPOINTS.ALL, { params });
+    // Backend đã cập nhật endpoint này sang POST để hỗ trợ gửi body dữ liệu (filtering).
+    return axiosInstance.post(DESIGN_VARIANT_ENDPOINTS.ALL, params);
   },
 
   // Add new variant
