@@ -62,7 +62,11 @@ const ManageProducts = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchInitialData();
+    const init = async () => {
+      await fetchInitialData();
+      fetchProducts(1); // Fetch list mặc định khi vào trang
+    };
+    init();
   }, []);
 
   const fetchInitialData = async () => {
@@ -89,10 +93,12 @@ const ManageProducts = () => {
         pageNumber: page,
         pageSize: pagination.pageSize,
         search: search || "",
-        designTemplateId: tempId || "",
-        materialId: matId || "",
         isActive: true
       };
+      
+      // Chỉ gửi ID nếu có giá trị để tránh lỗi 400 nếu backend check định dạng GUID
+      if (tempId) params.designTemplateId = tempId;
+      if (matId) params.materialId = matId;
       
       const response = await designVariantApi.getAll(params);
       setProducts(response.data || []);
@@ -344,11 +350,15 @@ const ManageProducts = () => {
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           <Table 
             columns={columns} 
-            dataSource={products.filter(p => 
-              p.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-              (!selectedCategory || p.category === selectedCategory)
-            )} 
+            dataSource={products} 
             rowKey="id"
+            loading={loading}
+            pagination={{
+              current: pagination.current,
+              pageSize: pagination.pageSize,
+              total: pagination.total,
+              onChange: (page) => fetchProducts(page)
+            }}
           />
         </div>
 
