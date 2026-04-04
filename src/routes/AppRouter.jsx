@@ -325,7 +325,7 @@ const AppRouter = () => {
           path="/login"
           element={
             <Layout>
-              <LoginRedirect />
+              <Login />
             </Layout>
           }
         />
@@ -333,7 +333,7 @@ const AppRouter = () => {
           path="/register"
           element={
             <Layout>
-              <RegisterRedirect />
+              <Register />
             </Layout>
           }
         />

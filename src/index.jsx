@@ -2,16 +2,19 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import 'antd/dist/reset.css';
 import './index.css';
-import App from './App';
+import App from './App'; // Component giao diện gốc của bạn
 import reportWebVitals from './reportWebVitals';
-import { ConfigProvider } from 'antd';
+import { ConfigProvider, App as AntApp } from 'antd'; // 🔥 Đổi tên App của Antd thành AntApp
 import { antdTheme } from './theme/antdTheme';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
     <ConfigProvider theme={antdTheme}>
-      <App />
+      {/* Bọc AntApp ngay bên trong ConfigProvider để message nhận được Theme */}
+      <AntApp>
+        <App />
+      </AntApp>
     </ConfigProvider>
   </React.StrictMode>
 );

@@ -6,9 +6,9 @@ export const AUTH_ENDPOINTS = {
 };
 
 export const MATERIAL_ENDPOINTS = {
-  QUERY: '/api/material/query',
-  ADD: '/api/material/add',
-  UPDATE_PRICE: '/api/material/update-price',
+  QUERY: '/material/query',
+  ADD: '/material/add',
+  UPDATE_PRICE: '/material/update-price',
 };
 
 export const CONCEP_TAG_ENDPOINTS = {
