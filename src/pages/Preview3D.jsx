@@ -1,12 +1,26 @@
 import React, { useRef, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import * as THREE from 'three';
+import { Breadcrumb } from 'antd';
 
 const Preview3D = () => {
   const { id } = useParams();
+  const location = useLocation();
   const mountRef = useRef(null);
+  
+  // Get breadcrumb data from navigation state, fallback to default
+  const rawBreadcrumb = location.state?.breadcrumb || [
+    { title: 'Trang chủ', path: '/' },
+    { title: 'Đơn hàng của tôi', path: '/my-custom-orders' },
+    { title: 'Xem mô hình 3D', path: null }
+  ];
+
+  const breadcrumbItems = rawBreadcrumb.map((item) => ({
+    title: item.path ? <Link to={item.path}>{item.title}</Link> : item.title
+  }));
 
   useEffect(() => {
+    // ... (ThreeJS setup code - giữ nguyên phần tạo scene) ...
     if (!mountRef.current) return;
 
     // Scene setup
@@ -50,8 +64,9 @@ const Preview3D = () => {
     window.addEventListener('mousemove', handleMouseMove);
 
     // Animation
+    let animationId;
     const animate = () => {
-      requestAnimationFrame(animate);
+      animationId = requestAnimationFrame(animate);
       cube.rotation.y += 0.01;
       cube.rotation.x += 0.005;
       renderer.render(scene, camera);
@@ -60,6 +75,7 @@ const Preview3D = () => {
 
     // Handle resize
     const handleResize = () => {
+      if (!mountRef.current) return;
       camera.aspect = mountRef.current.clientWidth / mountRef.current.clientHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight);
@@ -70,13 +86,27 @@ const Preview3D = () => {
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('resize', handleResize);
-      mountRef.current.removeChild(renderer.domElement);
+      cancelAnimationFrame(animationId);
+      
+      if (mountRef.current && renderer.domElement) {
+        // Check if renderer.domElement is still a child of mountRef.current
+        if (mountRef.current.contains(renderer.domElement)) {
+          mountRef.current.removeChild(renderer.domElement);
+        }
+      }
       renderer.dispose();
+      // Dispose geometry and material
+      geometry.dispose();
+      material.dispose();
     };
   }, [id]);
 
   return (
     <div className="max-w-7xl mx-auto px-8 py-8">
+      <div className="mb-6">
+        <Breadcrumb items={breadcrumbItems} />
+      </div>
+
       <h1 className="text-3xl font-bold mb-6 text-gray-800">3D Preview</h1>
       <div className="bg-white rounded-lg shadow-lg p-4">
         <div

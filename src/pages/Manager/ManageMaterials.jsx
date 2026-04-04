@@ -36,32 +36,23 @@ const ManageMaterials = () => {
   const fetchMaterials = async (searchText = '') => {
     setLoadingMaterials(true);
     try {
-      const params = {
-        search: searchText,
-        isActive: true,
-        paging: { pageIndex: 1, pageSize: 100 } // Fetch all for now or implement proper pagination
-      };
-      const response = await materialApi.query(params);
-      // Assuming response.data contains the list in a specific format. 
-      // Adjusting based on typical API response wrapper if standard BaseResponseModel
-      // If BaseResponseModel: { data: [...], ... }
-      setMaterials(response.data || []); 
+      const response = await materialApi.getAll();
+      
+      // BaseResponseModel: { statusCode: 200, data: [...] }
+      let fetchedData = response.data || [];
+      
+      // Lọc client side nếu endpoint getAll không hỗ trợ params search
+      if (searchText) {
+        fetchedData = fetchedData.filter(m => 
+          m.name.toLowerCase().includes(searchText.toLowerCase())
+        );
+      }
+      
+      setMaterials(fetchedData); 
     } catch (error) {
       console.error("Failed to fetch materials", error);
-      // message.error('Không thể tải danh sách vật liệu');
-      // Set mock data if API fails (for development without backend)
-      setMaterials([
-        { 
-          id: '1', name: 'PLA Basic', description: 'Nhựa in cơ bản', 
-          baseCostPerGram: 100, totalServiceCostPerGram: 300, 
-          isActive: true, isCurrent: true 
-        },
-        { 
-          id: '2', name: 'Resin Standard', description: 'Nhựa lỏng tiêu chuẩn', 
-          baseCostPerGram: 500, totalServiceCostPerGram: 1500, 
-          isActive: true, isCurrent: true 
-        }
-      ]);
+      message.error('Lỗi khi tải danh sách vật liệu từ máy chủ.');
+      setMaterials([]);
     } finally {
       setLoadingMaterials(false);
     }
@@ -94,7 +85,13 @@ const ManageMaterials = () => {
 
   const handleCreateMaterial = async (values) => {
     try {
-      await materialApi.add(values);
+      // Backend yêu cầu effectiveDate
+      const payload = {
+        ...values,
+        effectiveDate: new Date().toISOString()
+      };
+      
+      await materialApi.add(payload);
       message.success('Thêm vật liệu thành công');
       setIsMaterialModalVisible(false);
       materialForm.resetFields();

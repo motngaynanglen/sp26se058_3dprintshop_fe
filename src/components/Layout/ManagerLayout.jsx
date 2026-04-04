@@ -32,6 +32,11 @@ const ManagerLayout = ({ children }) => {
       icon: '🧱'
     },
     {
+      path: '/manager/design-templates',
+      label: 'Quản lý Design Template',
+      icon: '🎨'
+    },
+    {
       path: '/manager/staff',
       label: 'Quản lý nhân viên',
       icon: '👥'
@@ -40,6 +45,16 @@ const ManagerLayout = ({ children }) => {
       path: '/manager/feedback',
       label: 'Phản hồi',
       icon: '💬'
+    },
+    {
+      path: '/manager/invoices',
+      label: 'Quản lý Hóa Đơn',
+      icon: '🧾'
+    },
+    {
+      path: '/manager/transactions',
+      label: 'Quản lý Giao Dịch',
+      icon: '💰'
     }
   ];
 
@@ -98,7 +113,7 @@ const ManagerLayout = ({ children }) => {
       </Sider>
       <AntLayout style={{ marginLeft: 250, minHeight: '100vh', background: '#f5f5f5' }}>
         <Content style={{ margin: '24px 16px 0', overflow: 'initial' }}>
-          <div className="max-w-7xl mx-auto px-4 lg:px-6 py-6 pb-20">
+          <div className="px-4 py-6 pb-20">
             {children}
           </div>
         </Content>

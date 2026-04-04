@@ -2,6 +2,15 @@ import axiosInstance from './axiosInstance';
 import { MATERIAL_ENDPOINTS } from './endpoints';
 
 const materialApi = {
+  getAll: async () => {
+    try {
+      const response = await axiosInstance.get(MATERIAL_ENDPOINTS.GET_ALL);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
   query: async (params) => {
     try {
       const response = await axiosInstance.post(MATERIAL_ENDPOINTS.QUERY, params);

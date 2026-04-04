@@ -1,17 +1,24 @@
 import React, { useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Badge, Button, Grid, Input, Layout, Menu, Space, Typography } from 'antd';
-import { ShoppingCartOutlined, SearchOutlined, UserOutlined } from '@ant-design/icons';
+import { Badge, Button, Grid, Input, Layout, Menu, Space, Typography, Dropdown, Avatar } from 'antd';
+import { ShoppingCartOutlined, SearchOutlined, UserOutlined, DownOutlined, UnorderedListOutlined, FileTextOutlined, LogoutOutlined } from '@ant-design/icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAuthModal } from '../../contexts/AuthModalContext';
+
+import { useCart } from '../../contexts/CartContext';
 
 const Header = () => {
   const { user, logout, isAuthenticated } = useAuth();
   const { openModal } = useAuthModal();
+  const { totalItems } = useCart();
   const navigate = useNavigate();
   const location = useLocation();
   const screens = Grid.useBreakpoint();
   const [q, setQ] = useState('');
+// ... (skip lines to reach badge)
+// Thay vì dùng `0`, dùng `totalItems`
+// Tôi sẽ tìm function header ở StartLine 8 và render ở dưới
+
 
   const handleLogout = () => {
     logout();
@@ -32,6 +39,37 @@ const Header = () => {
     setQ(term);
     navigate(`/products${term ? `?q=${encodeURIComponent(term)}` : ''}`);
   };
+
+  const menuItems = [
+    {
+      key: 'profile',
+      icon: <UserOutlined />,
+      label: <Link to="/profile">Thông tin tài khoản</Link>,
+    },
+    {
+      type: 'divider',
+    },
+    {
+      key: 'orders',
+      icon: <UnorderedListOutlined />,
+      label: <Link to="/my-orders">Đơn hàng của tôi</Link>,
+    },
+    {
+      key: 'custom-orders',
+      icon: <FileTextOutlined />,
+      label: <Link to="/my-custom-orders">Đơn hàng Custom</Link>,
+    },
+    {
+      type: 'divider',
+    },
+    {
+      key: 'logout',
+      icon: <LogoutOutlined />,
+      label: 'Đăng xuất',
+      danger: true,
+      onClick: handleLogout,
+    },
+  ];
 
   return (
     <Layout.Header style={{ padding: 0, height: 'auto', lineHeight: 'normal' }}>
@@ -89,7 +127,7 @@ const Header = () => {
           </div>
 
           <Space size={12} align="center" wrap style={{ justifyContent: 'flex-end' }}>
-            <Badge count={0} size="small">
+            <Badge count={totalItems} size="small" showZero={false}>
               <Button
                 type="default"
                 icon={<ShoppingCartOutlined />}
@@ -100,17 +138,15 @@ const Header = () => {
             </Badge>
 
             {isAuthenticated ? (
-              <Space size={10} align="center">
-                <Space direction="vertical" size={0} className="hidden md:flex" style={{ alignItems: 'flex-end' }}>
-                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                    Xin chào,
-                  </Typography.Text>
-                  <Typography.Text strong style={{ maxWidth: 180 }} ellipsis>
-                    {user?.fullName || user?.username}
-                  </Typography.Text>
-                </Space>
-                <Button onClick={handleLogout}>Đăng xuất</Button>
-              </Space>
+              <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
+                <Button type="text" className="flex items-center gap-2 hover:bg-slate-100">
+                  <Avatar size="small" icon={<UserOutlined />} style={{ backgroundColor: '#4f46e5' }} />
+                  <span className="font-medium text-slate-700 hidden sm:inline">
+                    {user?.fullName || user?.username || 'Khách hàng'}
+                  </span>
+                  <DownOutlined className="text-xs text-slate-400" />
+                </Button>
+              </Dropdown>
             ) : (
               <Space size={8} align="center">
                 <Button icon={<UserOutlined />} onClick={() => openModal('login')}>

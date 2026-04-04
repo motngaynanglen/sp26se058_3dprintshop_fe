@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useCart } from '../contexts/CartContext';
+import { getProductById } from '../data/products';
 import {
   Button,
   InputNumber,
@@ -14,7 +16,8 @@ import {
   Row,
   Col,
   Image,
-  Tooltip
+  Tooltip,
+  notification
 } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -23,6 +26,7 @@ import {
   InfoCircleOutlined,
   CheckCircleOutlined
 } from '@ant-design/icons';
+import '@google/model-viewer';
 
 const { Option } = Select;
 
@@ -31,7 +35,9 @@ const ProductDetail = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated, isCustomer, isManager, isAdmin, isEmployee } = useAuth();
+  const { addToCart } = useCart();
   
+  const [product, setProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [selectedMaterial, setSelectedMaterial] = useState('PLA');
 
@@ -39,38 +45,17 @@ const ProductDetail = () => {
   const fromFeedback = location.state?.from === 'feedback';
   const previousPath = location.state?.previousPath || '/products';
 
-  // Mock product data - Enhanced
-  const product = {
-    id: id,
-    name: 'Mô hình 3D Custom Logo Công ty',
-    price: 500000,
-    description: 'Sản phẩm rất đẹp, chất lượng in tốt, màu sắc chuẩn. Phù hợp để làm quà tặng doanh nghiệp hoặc trang trí văn phòng.',
-    materials: ['PLA', 'ABS', 'TPU', 'Wood PLA', 'PETG'],
-    stock: 10,
-    rating: 4.5,
-    reviewCount: 24,
-    images: [
-      'https://via.placeholder.com/600x600?text=Product+Image+1',
-      'https://via.placeholder.com/600x600?text=Product+Image+2',
-      'https://via.placeholder.com/600x600?text=Product+Image+3',
-      'https://via.placeholder.com/600x600?text=Product+Image+4'
-    ],
-    specifications: {
-      dimensions: '20 x 20 x 15 cm',
-      weight: '250g',
-      printTime: '12 giờ',
-      layerHeight: '0.2mm',
-      infill: '20%',
-      color: 'Đỏ'
-    },
-    features: [
-      'In 3D chất lượng cao',
-      'Màu sắc bền đẹp',
-      'Có thể tùy chỉnh theo yêu cầu',
-      'Giao hàng nhanh chóng',
-      'Bảo hành 6 tháng'
-    ]
-  };
+  useEffect(() => {
+    const foundProduct = getProductById(id);
+    if (foundProduct) {
+      setProduct(foundProduct);
+      if (foundProduct.materials?.length > 0) {
+        setSelectedMaterial(foundProduct.materials[0]);
+      }
+    } else {
+      // Handle not found (could redirect or show skeleton)
+    }
+  }, [id]);
 
   const handleGoBack = () => {
     if (fromFeedback) {
@@ -87,26 +72,26 @@ const ProductDetail = () => {
       navigate('/login');
       return;
     }
-    // TODO: Add to cart logic
-    alert(`Đã thêm ${quantity} sản phẩm vào giỏ hàng!`);
+    addToCart(product, quantity, selectedMaterial);
+    notification.success({
+      message: 'Đã thêm vào giỏ hàng',
+      description: `Thêm ${quantity} sản phẩm "${product.name}" với vật liệu ${selectedMaterial} thành công.`,
+      placement: 'bottomRight'
+    });
   };
 
   // Determine if should show Add to Cart
   const showAddToCart = isCustomer;
+
+  if (!product) {
+    return <div className="min-h-screen flex items-center justify-center font-medium text-slate-500">Đang tải dữ liệu sản phẩm...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Back Button & Breadcrumb */}
         <div className="mb-6">
-          <Button
-            icon={<ArrowLeftOutlined />}
-            onClick={handleGoBack}
-            size="large"
-            className="mb-4"
-          >
-            Quay lại {fromFeedback ? 'Feedback' : ''}
-          </Button>
 
           <Breadcrumb
             items={[
@@ -120,30 +105,35 @@ const ProductDetail = () => {
         {/* Main Product Section */}
         <Card className="mb-6">
           <Row gutter={[32, 32]}>
-            {/* Image Gallery */}
+            {/* Image Gallery - Sticky & Enhanced */}
             <Col xs={24} lg={12}>
-              <div className="sticky top-4">
-                <Image.PreviewGroup>
-                  <div className="mb-4">
-                    <Image
-                      src={product.images[0]}
-                      alt={product.name}
-                      className="w-full rounded-lg"
-                      style={{ maxHeight: 500, objectFit: 'cover' }}
+              <div className="sticky top-24">
+                {/* Switch between 3D Model and Image */}
+                <div className="mb-4 overflow-hidden rounded-xl border border-gray-200 bg-slate-50 relative aspect-square w-full">
+                  {product.modelSrc ? (
+                    <model-viewer
+                      src={product.modelSrc}
+                      camera-controls
+                      auto-rotate
+                      shadow-intensity="1"
+                      environment-image="neutral"
+                      exposure="1.2"
+                      style={{ width: '100%', height: '100%', backgroundColor: '#f8fafc' }}
                     />
-                  </div>
-                  <div className="grid grid-cols-4 gap-2">
-                    {product.images.map((img, idx) => (
-                      <Image
-                        key={idx}
-                        src={img}
-                        alt={`${product.name} - ${idx + 1}`}
-                        className="rounded cursor-pointer hover:opacity-80 transition-opacity"
-                        style={{ height: 100, objectFit: 'cover' }}
-                      />
-                    ))}
-                  </div>
-                </Image.PreviewGroup>
+                  ) : (
+                    <Image
+                      src={activeImage || product.images?.[0]}
+                      alt={product.name}
+                      className="w-full h-full object-contain"
+                      preview={{ src: activeImage || product.images?.[0] }}
+                    />
+                  )}
+                  {product.modelSrc && (
+                    <div className="absolute top-3 right-3 bg-indigo-600 text-white text-[11px] font-semibold px-2 py-1 rounded-full shadow-sm">
+                      3D Interactive
+                    </div>
+                  )}
+                </div>
               </div>
             </Col>
 
@@ -239,7 +229,16 @@ const ProductDetail = () => {
                   <Button
                     size="large"
                     icon={<EyeOutlined />}
-                    onClick={() => navigate(`/preview/${id}`)}
+                    onClick={() => navigate(`/preview/${id}`, {
+                      state: {
+                        breadcrumb: [
+                          { title: 'Trang chủ', path: '/' },
+                          { title: 'Sản phẩm', path: '/products' },
+                          { title: product.name, path: `/products/${id}` },
+                          { title: 'Xem mô hình 3D', path: null }
+                        ]
+                      }
+                    })}
                     block
                     style={{ height: 50 }}
                   >

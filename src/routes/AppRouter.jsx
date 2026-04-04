@@ -6,6 +6,7 @@ import PrivateRoute from './PrivateRoute';
 import PublicRoute from './PublicRoute';
 import { useAuthModal } from '../contexts/AuthModalContext';
 import AuthModal from '../components/Auth/AuthModal';
+import ScrollToTop from '../components/Common/ScrollToTop';
 
 // General Pages
 import Home from '../pages/Home';
@@ -49,10 +50,16 @@ import StaffCreateProductionJob from "../pages/Staff/StaffCreateProductionJob";
 import AdminDashboard from "../pages/Manager/ManagerDashboard";
 import ManageProducts from "../pages/Manager/ManageProducts";
 import ManageMaterials from "../pages/Manager/ManageMaterials";
+import ManageDesignTemplates from "../pages/Manager/ManageDesignTemplates";
+import DesignTemplateEdit from "../pages/Manager/DesignTemplateEdit";
 import ManageStaffAccounts from "../pages/Manager/ManageStaffAccounts";
 import ManageUsers from "../pages/Manager/ManageUsers";
 import FeedbackList from "../pages/Manager/FeedbackList";
 import SystemSettings from "../pages/Manager/SystemSettings";
+import ManagerInvoices from "../pages/Manager/ManagerInvoices";
+import ManagerTransactions from "../pages/Manager/ManagerTransactions";
+import ManagerInvoiceDetail from "../pages/Manager/ManagerInvoiceDetail";
+import ManagerTransactionDetail from "../pages/Manager/ManagerTransactionDetail";
 
 // Manager Pages (Already imported via above or handled)
 import ManagerDashboard from '../pages/Manager/ManagerDashboard';
@@ -74,9 +81,12 @@ const RegisterRedirect = () => {
   return <Navigate to="/" replace />;
 };
 
+
+
 const AppRouter = () => {
   return (
     <Router>
+      <ScrollToTop />
       <Routes>
         {/* Routes không có Layout (Manager, Admin, Staff) - đặt trước để match trước */}
 
@@ -112,6 +122,36 @@ const AppRouter = () => {
           }
         />
         <Route
+          path="/manager/design-templates"
+          element={
+            <PrivateRoute requiredRole={['manager', 'admin']}>
+              <ManagerLayout>
+                <ManageDesignTemplates />
+              </ManagerLayout>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/manager/design-templates/create"
+          element={
+            <PrivateRoute requiredRole={['manager', 'admin']}>
+              <ManagerLayout>
+                <DesignTemplateEdit />
+              </ManagerLayout>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/manager/design-templates/edit/:id"
+          element={
+            <PrivateRoute requiredRole={['manager', 'admin']}>
+              <ManagerLayout>
+                <DesignTemplateEdit />
+              </ManagerLayout>
+            </PrivateRoute>
+          }
+        />
+        <Route
           path="/manager/staff"
           element={
             <PrivateRoute requiredRole={['manager', 'admin']}>
@@ -127,6 +167,46 @@ const AppRouter = () => {
             <PrivateRoute requiredRole={['manager', 'admin']}>
               <ManagerLayout>
                 <FeedbackList />
+              </ManagerLayout>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/manager/invoices"
+          element={
+            <PrivateRoute requiredRole={['manager', 'admin']}>
+              <ManagerLayout>
+                <ManagerInvoices />
+              </ManagerLayout>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/manager/invoices/:id"
+          element={
+            <PrivateRoute requiredRole={['manager', 'admin']}>
+              <ManagerLayout>
+                <ManagerInvoiceDetail />
+              </ManagerLayout>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/manager/transactions"
+          element={
+            <PrivateRoute requiredRole={['manager', 'admin']}>
+              <ManagerLayout>
+                <ManagerTransactions />
+              </ManagerLayout>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/manager/transactions/:id"
+          element={
+            <PrivateRoute requiredRole={['manager', 'admin']}>
+              <ManagerLayout>
+                <ManagerTransactionDetail />
               </ManagerLayout>
             </PrivateRoute>
           }
