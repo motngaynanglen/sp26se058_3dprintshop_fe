@@ -13,7 +13,17 @@ const designTemplateApi = {
 
   getDetail: async (id) => {
     try {
-      const url = `${DESIGN_TEMPLATE_ENDPOINTS.DETAIL}/${id}`;
+      const url = `${DESIGN_TEMPLATE_ENDPOINTS.DETAIL}/${id}/detail`;
+      const response = await axiosInstance.get(url);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  getTemplatesByTag: async (tagId) => {
+    try {
+      const url = `${DESIGN_TEMPLATE_ENDPOINTS.DETAIL}/tags/${tagId}`;
       const response = await axiosInstance.get(url);
       return response.data;
     } catch (error) {
@@ -32,7 +42,7 @@ const designTemplateApi = {
 
   update: async (id, data) => {
     try {
-      const url = `${DESIGN_TEMPLATE_ENDPOINTS.UPDATE}/${id}`;
+      const url = `${DESIGN_TEMPLATE_ENDPOINTS.UPDATE}/${id}/update`;
       const response = await axiosInstance.put(url, data);
       return response.data;
     } catch (error) {
@@ -42,8 +52,8 @@ const designTemplateApi = {
 
   delete: async (id) => {
     try {
-      const url = `${DESIGN_TEMPLATE_ENDPOINTS.DELETE}/${id}`;
-      const response = await axiosInstance.delete(url);
+      const url = `${DESIGN_TEMPLATE_ENDPOINTS.DELETE}/${id}/delete`;
+      const response = await axiosInstance.delete(url, { data: {} });
       return response.data;
     } catch (error) {
       throw error;

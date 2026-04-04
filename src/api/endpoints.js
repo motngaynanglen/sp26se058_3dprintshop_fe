@@ -7,35 +7,40 @@ export const AUTH_ENDPOINTS = {
 
 export const MATERIAL_ENDPOINTS = {
   GET_ALL: "/api/material/all",
-  QUERY: "/api/material/query",
+  DETAIL: "/api/material", // appending /{id}/detail
   ADD: "/api/material/add",
-  UPDATE_PRICE: "/api/material/update-price",
+  UPDATE: "/api/material", // appending /{id}/update
+  TOGGLE_ACTIVE: "/api/material", // appending /{id}/toggle-active
 };
 
 export const CONCEP_TAG_ENDPOINTS = {
   GET_ALL: "/api/concept-tag/all",
+  QUERY: "/api/concept-tag/query",
   ADD: "/api/concept-tag/add",
-  UPDATE: "/api/concept-tag/update", // appending /{id} in service
+  UPDATE: "/api/concept-tag", // appending /{id}/update
   DELETE: "/api/concept-tag/delete", // appending /{id} in service
 };
 
 export const DESIGN_TEMPLATE_ENDPOINTS = {
   QUERY: "/api/design-template/query",
-  DETAIL: "/api/design-template/detail", // appending /{id} in service
+  DETAIL: "/api/design-template", // appending /{id}/detail in service
   ADD: "/api/design-template/add",
-  UPDATE: "/api/design-template/update", // appending /{id} in service
-  DELETE: "/api/design-template/delete", // appending /{id} in service
+  UPDATE: "/api/design-template", // appending /{id}/update in service
+  DELETE: "/api/design-template", // appending /{id}/delete in service
 };
 
 export const DESIGN_TAG_ENDPOINTS = {
-  GET_TAGS: "/api/design-template", // appending /{id}/tags in service
+  GET_TAGS: "/api/design-tag", // appending /{id}/tags in service
   SYNC: "/api/design-tag/sync",
+  ADD: "/api/design-tag",
+  UPDATE: "/api/design-tag", // appending /{id}
+  DELETE: "/api/design-tag", // appending /{id}
 };
 
 export const DESIGN_VARIANT_ENDPOINTS = {
-  ALL: "/api/design-variant/all",
+  SEARCH: "/api/design-variant",
   ADD: "/api/design-variant/add",
-  GET_DETAIL: "/api/design-variant/detail", // appending /{id}
-  UPDATE: "/api/design-variant/update", // appending /{id}
-  DELETE: "/api/design-variant/delete", // appending /{id}
+  UPDATE: "/api/design-variant/update", 
+  UPDATE_QUANTITY: "/api/design-variant/quantity",
+  DELETE: "/api/design-variant", // appending /{id}/delete
 };

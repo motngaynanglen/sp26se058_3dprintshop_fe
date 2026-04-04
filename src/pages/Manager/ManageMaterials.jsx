@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Table, Button, Modal, Form, Input, InputNumber, 
-  Tag, Card, Row, Col, Space, message, Typography, Divider, Tooltip 
+  Tag, Card, Row, Col, Space, message, Typography, Divider, Tooltip, Switch, Popconfirm, Pagination
 } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, HistoryOutlined } from '@ant-design/icons';
 import materialApi from '../../api/materialApi';
@@ -18,14 +18,18 @@ const ManageMaterials = () => {
   const [loadingMaterials, setLoadingMaterials] = useState(false);
   const [loadingTags, setLoadingTags] = useState(false);
 
+  // Tag Pagination & Search State
+  const [tagSearchText, setTagSearchText] = useState('');
+  const [tagPagination, setTagPagination] = useState({ current: 1, pageSize: 10, total: 0 });
+
   // Modal States
   const [isMaterialModalVisible, setIsMaterialModalVisible] = useState(false);
-  const [isUpdatePriceModalVisible, setIsUpdatePriceModalVisible] = useState(false);
+  const [isUpdateMaterialModalVisible, setIsUpdateMaterialModalVisible] = useState(false);
   const [isTagModalVisible, setIsTagModalVisible] = useState(false);
   
   // Forms
   const [materialForm] = Form.useForm();
-  const [priceForm] = Form.useForm();
+  const [updateMaterialForm] = Form.useForm();
   const [tagForm] = Form.useForm();
 
   // Selected Items
@@ -58,19 +62,26 @@ const ManageMaterials = () => {
     }
   };
 
-  const fetchTags = async () => {
+  const fetchTags = async (page = 1, search = '') => {
     setLoadingTags(true);
     try {
-      const response = await conceptTagApi.getAll();
-       // If BaseResponseModel: { data: [...], ... }
-      setTags(response.data || []);
+      const response = await conceptTagApi.query({
+         pageNumber: page,
+         pageSize: tagPagination.pageSize,
+         search: search
+      });
+      // response could be { data: [...], additionalData: { paging... } } or direct array
+      const fetchedTags = Array.isArray(response) ? response : (response?.data || []);
+      setTags(fetchedTags);
+
+      setTagPagination(prev => ({
+        ...prev,
+        current: page,
+        total: response?.additionalData?.paging?.totalCount || fetchedTags.length
+      }));
     } catch (error) {
       console.error("Failed to fetch tags", error);
-      // Mock data
-      setTags([
-        { id: '1', name: 'Artistic', description: 'Mẫu nghệ thuật', isActive: true },
-        { id: '2', name: 'Mechanical', description: 'Chi tiết cơ khí', isActive: true }
-      ]);
+      setTags([]);
     } finally {
       setLoadingTags(false);
     }
@@ -78,7 +89,7 @@ const ManageMaterials = () => {
 
   useEffect(() => {
     fetchMaterials();
-    fetchTags();
+    fetchTags(1, '');
   }, []);
 
   // --- Handlers: Material ---
@@ -101,41 +112,46 @@ const ManageMaterials = () => {
     }
   };
 
-  const handleUpdatePrice = async (values) => {
+  const handleUpdateMaterial = async (values) => {
     if (!selectedMaterial) return;
     try {
       const payload = {
-        materialId: selectedMaterial.id,
-        newBaseCost: values.baseCostPerGram,
-        newServiceCost: values.totalServiceCostPerGram,
-        effectiveDate: null // Backend sets to NOW
+        name: values.name,
+        description: values.description,
+        baseCostPerGram: values.baseCostPerGram,
+        totalServiceCostPerGram: values.totalServiceCostPerGram,
+        effectiveDate: new Date().toISOString()
       };
       
-      // Note: API spec calls for wrapping in specific object structure if needed, 
-      // strictly following spec: { "materialId": "...", "newPrice": ... } ? 
-      // Prompt says: "Create ... Request Body: ... baseCostPerGram...". 
-      // Update Price Endpoint isn't fully detailed in "Request Body" in prompt section 2.1 
-      // except "Logic: Không ghi đè...". 
-      // Section 4 Example response shows "newPrice", implying we send price.
-      // I will assume payload structure matches the fields needed.
-      
-      await materialApi.updatePrice(payload);
-      message.success('Cập nhật giá thành công');
-      setIsUpdatePriceModalVisible(false);
-      priceForm.resetFields();
+      await materialApi.update(selectedMaterial.id, payload);
+      message.success('Cập nhật vật liệu thành công');
+      setIsUpdateMaterialModalVisible(false);
+      updateMaterialForm.resetFields();
       fetchMaterials(); // Refresh to show new current price
     } catch (error) {
-      message.error('Cập nhật giá thất bại');
+      message.error('Cập nhật vật liệu thất bại');
     }
   };
 
-  const openUpdatePriceModal = (record) => {
+  const openUpdateMaterialModal = (record) => {
     setSelectedMaterial(record);
-    priceForm.setFieldsValue({
+    updateMaterialForm.setFieldsValue({
+      name: record.name,
+      description: record.description,
       baseCostPerGram: record.baseCostPerGram,
       totalServiceCostPerGram: record.totalServiceCostPerGram
     });
-    setIsUpdatePriceModalVisible(true);
+    setIsUpdateMaterialModalVisible(true);
+  };
+
+  const handleToggleActive = async (id, checked) => {
+    try {
+      await materialApi.toggleActive(id);
+      message.success(`Đã thay đổi trạng thái vật liệu`);
+      fetchMaterials();
+    } catch (error) {
+      message.error('Thay đổi trạng thái thất bại');
+    }
   };
 
   // --- Handlers: Tags ---
@@ -154,7 +170,7 @@ const ManageMaterials = () => {
       setIsTagModalVisible(false);
       tagForm.resetFields();
       setSelectedTag(null);
-      fetchTags();
+      fetchTags(tagPagination.current, tagSearchText);
     } catch (error) {
       message.error('Thao tác thất bại');
     }
@@ -171,7 +187,7 @@ const ManageMaterials = () => {
         try {
           await conceptTagApi.delete(id);
           message.success('Đã xóa thẻ');
-          fetchTags();
+          fetchTags(tagPagination.current, tagSearchText);
         } catch (error) {
           message.error('Xóa thất bại');
         }
@@ -213,19 +229,28 @@ const ManageMaterials = () => {
       render: (val) => val ? <Tag color="blue">{val.toLocaleString()}</Tag> : '-',
     },
     {
+      title: 'Trạng thái',
+      dataIndex: 'isActive',
+      key: 'isActive',
+      render: (active, record) => (
+         <Switch 
+           checked={active} 
+           onChange={(checked) => handleToggleActive(record.id, checked)} 
+         />
+      )
+    },
+    {
       title: 'Tác vụ',
       key: 'action',
       render: (_, record) => (
         <Space size="middle">
-          <Tooltip title="Cập nhật giá mới">
+          <Tooltip title="Cập nhật">
             <Button 
               type="text" 
-              icon={<HistoryOutlined />} 
-              onClick={() => openUpdatePriceModal(record)}
+              icon={<EditOutlined />} 
+              onClick={() => openUpdateMaterialModal(record)}
               className="text-blue-600 hover:text-blue-800"
-            >
-              Cập nhật giá
-            </Button>
+            />
           </Tooltip>
         </Space>
       ),
@@ -295,7 +320,17 @@ const ManageMaterials = () => {
               }
               className="shadow-sm rounded-lg"
             >
-              <div className="flex flex-wrap gap-2">
+              <div className="mb-4">
+                <Search 
+                  placeholder="Tìm kiếm thẻ phân loại..." 
+                  onSearch={(value) => fetchTags(1, value)} 
+                  onChange={(e) => setTagSearchText(e.target.value)}
+                  value={tagSearchText}
+                  enterButton 
+                  allowClear
+                />
+              </div>
+              <div className="flex flex-wrap gap-2 mb-4">
                 {tags.map(tag => (
                   <Tag 
                     key={tag.id} 
@@ -309,6 +344,16 @@ const ManageMaterials = () => {
                   </Tag>
                 ))}
                 {tags.length === 0 && !loadingTags && <Text type="secondary">Chưa có thẻ nào.</Text>}
+              </div>
+              <div className="flex justify-end">
+                <Pagination 
+                  current={tagPagination.current} 
+                  pageSize={tagPagination.pageSize} 
+                  total={tagPagination.total} 
+                  onChange={(page) => fetchTags(page, tagSearchText)}
+                  size="small"
+                  showSizeChanger={false}
+                />
               </div>
             </Card>
           </Col>
@@ -368,19 +413,34 @@ const ManageMaterials = () => {
         </Form>
       </Modal>
 
-      {/* 2. Update Price Modal */}
+      {/* 2. Update Material Modal */}
       <Modal
-        title={<span>Cập nhật giá cho: <Text type="success">{selectedMaterial?.name}</Text></span>}
-        open={isUpdatePriceModalVisible}
-        onCancel={() => setIsUpdatePriceModalVisible(false)}
+        title={<span>Cập nhật vật liệu: <Text type="success">{selectedMaterial?.name}</Text></span>}
+        open={isUpdateMaterialModalVisible}
+        onCancel={() => setIsUpdateMaterialModalVisible(false)}
         footer={null}
       >
-        <Form form={priceForm} layout="vertical" onFinish={handleUpdatePrice}>
+        <Form form={updateMaterialForm} layout="vertical" onFinish={handleUpdateMaterial}>
+          <Form.Item 
+            name="name" 
+            label="Tên Vật liệu" 
+            rules={[{ required: true, message: 'Vui lòng nhập tên!' }]}
+          >
+            <Input placeholder="Ví dụ: Nhựa PLA Tough" />
+          </Form.Item>
+          
+          <Form.Item 
+            name="description" 
+            label="Mô tả"
+          >
+            <Input.TextArea placeholder="Mô tả đặc tính..." rows={2} />
+          </Form.Item>
+
            <Row gutter={16}>
             <Col span={12}>
               <Form.Item 
                 name="baseCostPerGram" 
-                label="Giá vốn MỚI (VNĐ/g)" 
+                label="Giá vốn (VNĐ/g)" 
                 rules={[{ required: true }]}
               >
                  <InputNumber min={0} style={{ width: '100%' }} />
@@ -389,7 +449,7 @@ const ManageMaterials = () => {
             <Col span={12}>
               <Form.Item 
                 name="totalServiceCostPerGram" 
-                label="Giá dịch vụ MỚI (VNĐ/g)" 
+                label="Giá dịch vụ (VNĐ/g)" 
                 rules={[{ required: true }]}
               >
                  <InputNumber min={0} style={{ width: '100%' }} />
@@ -397,8 +457,8 @@ const ManageMaterials = () => {
             </Col>
           </Row>
            <div className="text-right">
-            <Button onClick={() => setIsUpdatePriceModalVisible(false)} style={{ marginRight: 8 }}>Hủy</Button>
-            <Button type="primary" htmlType="submit">Cập nhật Giá</Button>
+            <Button onClick={() => setIsUpdateMaterialModalVisible(false)} style={{ marginRight: 8 }}>Hủy</Button>
+            <Button type="primary" htmlType="submit">Cập nhật Vật liệu</Button>
           </div>
         </Form>
       </Modal>

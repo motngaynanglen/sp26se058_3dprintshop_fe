@@ -11,6 +11,15 @@ const conceptTagApi = {
     }
   },
 
+  query: async (data) => {
+    try {
+      const response = await axiosInstance.post(CONCEP_TAG_ENDPOINTS.QUERY, data);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
   add: async (data) => {
     try {
       const response = await axiosInstance.post(CONCEP_TAG_ENDPOINTS.ADD, data);
@@ -22,7 +31,7 @@ const conceptTagApi = {
 
   update: async (id, data) => {
     try {
-      const url = `${CONCEP_TAG_ENDPOINTS.UPDATE}/${id}`;
+      const url = `${CONCEP_TAG_ENDPOINTS.UPDATE}/${id}/update`;
       const response = await axiosInstance.put(url, data);
       return response.data;
     } catch (error) {

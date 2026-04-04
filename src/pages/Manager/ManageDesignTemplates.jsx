@@ -5,6 +5,7 @@ import {
 import { PlusOutlined, EyeOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import designTemplateApi from '../../api/designTemplateApi';
+import conceptTagApi from '../../api/conceptTagApi';
 import { format } from 'date-fns';
 
 const { Search } = Input;
@@ -15,31 +16,48 @@ const ManageDesignTemplates = () => {
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [selectedTagId, setSelectedTagId] = useState(null);
+  const [tags, setTags] = useState([]);
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: 10,
     total: 0,
   });
 
-  const fetchTemplates = async (page = 1, search = searchText) => {
+  const fetchTemplates = async (page = 1, search = searchText, tagId = selectedTagId) => {
     setLoading(true);
     try {
-      const params = {
-        pageNumber: page,
-        pageSize: pagination.pageSize,
-        search: search || "",
-        isActive: true, // Swagger required true/false boolean, null caused 400
-        sortDescending: true,
-        sortBy: "createdAt" // Add a default sort string to avoid null
-      };
-      
-      const response = await designTemplateApi.query(params);
-      setTemplates(response.data || []);
-      setPagination({
-        ...pagination,
-        current: page,
-        total: response.additionalData?.paging?.totalCount || 0,
-      });
+      let response;
+      if (tagId) {
+        // Lấy theo tag
+        response = await designTemplateApi.getTemplatesByTag(tagId);
+        const fetchedData = Array.isArray(response) ? response : (response.data || []);
+        // Lọc thêm theo search nếu có
+        const filtered = search ? fetchedData.filter(x => x.name.toLowerCase().includes(search.toLowerCase()) || x.code.toLowerCase().includes(search.toLowerCase())) : fetchedData;
+        setTemplates(filtered);
+        setPagination({
+          ...pagination,
+          current: 1,
+          total: filtered.length,
+        });
+      } else {
+        // Truy vấn phân trang
+        const params = {
+          pageNumber: page,
+          pageSize: pagination.pageSize,
+          search: search || "",
+          isActive: true, 
+          sortDescending: true,
+          sortBy: "createdAt" 
+        };
+        response = await designTemplateApi.query(params);
+        setTemplates(response.data || []);
+        setPagination({
+          ...pagination,
+          current: page,
+          total: response.additionalData?.paging?.totalCount || 0,
+        });
+      }
     } catch (error) {
       console.error('Failed to fetch templates', error);
       message.error('Lỗi tải danh sách Design Template từ máy chủ.');
@@ -49,25 +67,37 @@ const ManageDesignTemplates = () => {
     }
   };
 
+  const fetchTags = async () => {
+    try {
+      const resp = await conceptTagApi.getAll();
+      setTags(resp.data || []);
+    } catch (error) {
+      console.error("Failed to fetch tags", error);
+    }
+  };
+
   useEffect(() => {
+    fetchTags();
     fetchTemplates();
   }, []);
 
   const handleSearch = (value) => {
     setSearchText(value);
-    fetchTemplates(1, value);
+    fetchTemplates(1, value, selectedTagId);
+  };
+
+  const handleTagChange = (tagId) => {
+    setSelectedTagId(tagId);
+    fetchTemplates(1, searchText, tagId);
   };
 
   const handleTableChange = (newPagination) => {
-    fetchTemplates(newPagination.current);
+    if (!selectedTagId) {
+      fetchTemplates(newPagination.current);
+    }
   };
 
   const handleDelete = async (record) => {
-    if (record.isActive) {
-      message.warning('Không thể xóa sản phẩm đang hoạt động. Vui lòng chuyển về Deactive trước.');
-      return;
-    }
-
     Modal.confirm({
       title: 'Xác nhận xóa',
       content: `Bạn có chắc chắn muốn xóa "${record.name}"?`,
@@ -106,12 +136,12 @@ const ManageDesignTemplates = () => {
       width: 80,
       render: (url) => (
         <Image
-          src={url || 'https://via.placeholder.com/50'}
+          src={url || 'https://picsum.photos/50'}
           alt="thumbnail"
           width={50}
           height={50}
           style={{ objectFit: 'cover', borderRadius: 4 }}
-          fallback="https://via.placeholder.com/50"
+          fallback="https://picsum.photos/50"
         />
       ),
     },
@@ -173,16 +203,14 @@ const ManageDesignTemplates = () => {
               className="text-blue-600 hover:text-blue-800"
             />
           </Tooltip>
-          {!record.isActive && (
-            <Tooltip title="Xóa">
-              <Button
-                type="text"
-                danger
-                icon={<DeleteOutlined />}
-                onClick={() => handleDelete(record)}
-              />
-            </Tooltip>
-          )}
+          <Tooltip title="Xóa">
+            <Button
+              type="text"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => handleDelete(record)}
+            />
+          </Tooltip>
         </Space>
       ),
     },
@@ -218,6 +246,18 @@ const ManageDesignTemplates = () => {
             onChange={(e) => !e.target.value && handleSearch('')}
             style={{ flex: 1 }}
           />
+          <Select
+            placeholder="Lọc theo thẻ (Tag)"
+            allowClear
+            size="large"
+            style={{ width: '100%', minWidth: 200, maxWidth: 300 }}
+            onChange={handleTagChange}
+            value={selectedTagId}
+          >
+            {tags.map(tag => (
+              <Option key={tag.id} value={tag.id}>{tag.name}</Option>
+            ))}
+          </Select>
         </div>
       </div>
 

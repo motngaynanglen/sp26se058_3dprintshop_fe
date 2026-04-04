@@ -2,10 +2,11 @@ import axiosInstance from './axiosInstance';
 import { DESIGN_VARIANT_ENDPOINTS } from './endpoints';
 
 const designVariantApi = {
-  // Query all variants with filtering and paging
+  // Query all variants with filtering
   getAll: async (params) => {
     try {
-      const response = await axiosInstance.post(DESIGN_VARIANT_ENDPOINTS.ALL, params);
+      // API expects { designTemplateId, materialId, isActive }
+      const response = await axiosInstance.post(DESIGN_VARIANT_ENDPOINTS.SEARCH, params);
       return response.data;
     } catch (error) {
       throw error;
@@ -22,20 +23,22 @@ const designVariantApi = {
     }
   },
 
-  // Get detail by ID
-  getDetail: async (id) => {
+  // Update variant
+  update: async (data) => {
     try {
-      const response = await axiosInstance.get(`${DESIGN_VARIANT_ENDPOINTS.GET_DETAIL}/${id}`);
+      // Cập nhật biến thể - takes full data payload
+      const response = await axiosInstance.put(DESIGN_VARIANT_ENDPOINTS.UPDATE, data);
       return response.data;
     } catch (error) {
       throw error;
     }
   },
 
-  // Update variant
-  update: async (id, data) => {
+  // Add stock quantity
+  addQuantity: async (data) => {
     try {
-      const response = await axiosInstance.put(`${DESIGN_VARIANT_ENDPOINTS.UPDATE}/${id}`, data);
+      // payload { id, additionalQuantity }
+      const response = await axiosInstance.put(DESIGN_VARIANT_ENDPOINTS.UPDATE_QUANTITY, data);
       return response.data;
     } catch (error) {
       throw error;
@@ -45,7 +48,7 @@ const designVariantApi = {
   // Delete variant
   delete: async (id) => {
     try {
-      const response = await axiosInstance.delete(`${DESIGN_VARIANT_ENDPOINTS.DELETE}/${id}`);
+      const response = await axiosInstance.delete(`${DESIGN_VARIANT_ENDPOINTS.DELETE}/${id}/delete`, { data: {} });
       return response.data;
     } catch (error) {
       throw error;

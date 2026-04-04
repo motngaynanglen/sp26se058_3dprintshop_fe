@@ -170,10 +170,34 @@ const ManageProducts = () => {
       };
 
       if (editingProduct) {
-        await designVariantApi.update(editingProduct.id, payload);
+        const updatePayload = {
+          id: editingProduct.id,
+          materialId: values.materialId,
+          code: values.code,
+          name: values.name,
+          sizeScale: values.sizeScale || 0,
+          stockQuantity: values.stockQuantity || 0,
+          price: values.price || 0,
+          isAllowPreOrder: values.isAllowPreOrder !== undefined ? values.isAllowPreOrder : true,
+          estimatedWeightPerUnit: values.estimatedWeightPerUnit || 0,
+          estimatedPrintTimePerUnit: values.estimatedPrintTimePerUnit || 0,
+        };
+        await designVariantApi.update(updatePayload);
         message.success('Cập nhật sản phẩm thành công');
       } else {
-        await designVariantApi.add(payload);
+        const addPayload = {
+          designTemplateId: values.designTemplateId,
+          materialId: values.materialId,
+          code: values.code,
+          name: values.name,
+          sizeScale: values.sizeScale || 0,
+          stockQuantity: values.stockQuantity || 0,
+          price: values.price || 0,
+          isAllowPreOrder: values.isAllowPreOrder !== undefined ? values.isAllowPreOrder : true,
+          estimatedWeightPerUnit: values.estimatedWeightPerUnit || 0,
+          estimatedPrintTimePerUnit: values.estimatedPrintTimePerUnit || 0,
+        };
+        await designVariantApi.add(addPayload);
         message.success('Thêm sản phẩm thành công');
       }
       
@@ -320,7 +344,11 @@ const ManageProducts = () => {
                  allowClear
                  showSearch
                  optionFilterProp="children"
-                 onChange={value => setFilterTemplateId(value)}
+                 value={filterTemplateId}
+                 onChange={value => {
+                   setFilterTemplateId(value);
+                   fetchProducts(1, searchTerm, filterMaterialId, value);
+                 }}
                >
                  {designTemplates.map(t => (
                    <Option key={t.id} value={t.id}>{t.name} ({t.code})</Option>
@@ -334,16 +362,38 @@ const ManageProducts = () => {
                  allowClear
                  showSearch
                  optionFilterProp="children"
-                 onChange={value => setFilterMaterialId(value)}
+                 value={filterMaterialId}
+                 onChange={value => {
+                   setFilterMaterialId(value);
+                   fetchProducts(1, searchTerm, value, filterTemplateId);
+                 }}
                >
                  {materials.map(m => (
                    <Option key={m.id} value={m.id}>{m.name}</Option>
                  ))}
                </Select>
              </Col>
-             <Col span={4}>
-               <Button type="primary" icon={<SearchOutlined />} onClick={() => fetchProducts(1)} block>
+             <Col span={2}>
+               <Button 
+                 icon={<SearchOutlined />} 
+                 type="primary"
+                 onClick={() => fetchProducts(1)}
+                 block
+               >
                  Tìm kiếm
+               </Button>
+             </Col>
+             <Col span={2}>
+               <Button 
+                 onClick={() => {
+                   setSearchTerm('');
+                   setFilterTemplateId(null);
+                   setFilterMaterialId(null);
+                   fetchProducts(1, '', null, null);
+                 }}
+                 block
+               >
+                 Xóa lọc
                </Button>
              </Col>
           </Row>
