@@ -10,9 +10,6 @@ import ScrollToTop from '../components/Common/ScrollToTop';
 
 // General Pages
 import Home from '../pages/Home';
-import Login from '../pages/Login';
-import Register from '../pages/Register';
-import ForgotPassword from '../pages/ForgotPassword';
 import ProductCatalog from '../pages/ProductCatalog';
 import ProductDetail from '../pages/ProductDetail';
 import ShoppingCart from '../pages/ShoppingCart';
@@ -22,6 +19,7 @@ import MyOrders from '../pages/MyOrders';
 import OrderDetail from '../pages/OrderDetail';
 
 // Customer Pages
+import UserProfilePage from "../pages/Customer/UserProfilePage";
 import CustomOrderType from "../pages/CustomOrderType";
 import CustomOrderUpload from "../pages/CustomOrderUpload";
 import CustomOrderRequestDesign from "../pages/CustomOrderRequestDesign";
@@ -46,23 +44,32 @@ import StaffTemplateManagement from "../pages/Staff/StaffTemplateManagement";
 import StaffTemplateDetail from "../pages/Staff/StaffTemplateDetail";
 import StaffCreateProductionJob from "../pages/Staff/StaffCreateProductionJob";
 
-// Admin Pages (using Manager components for now as Admin folder is missing)
+// Admin Pages
 import AdminDashboard from "../pages/Manager/ManagerDashboard";
 import ManageProducts from "../pages/Manager/ManageProducts";
 import ManageMaterials from "../pages/Manager/ManageMaterials";
 import ManageDesignTemplates from "../pages/Manager/ManageDesignTemplates";
 import DesignTemplateEdit from "../pages/Manager/DesignTemplateEdit";
 import ManageStaffAccounts from "../pages/Manager/ManageStaffAccounts";
-import ManageUsers from "../pages/Manager/ManageUsers";
 import FeedbackList from "../pages/Manager/FeedbackList";
 import SystemSettings from "../pages/Manager/SystemSettings";
 import ManagerInvoices from "../pages/Manager/ManagerInvoices";
 import ManagerTransactions from "../pages/Manager/ManagerTransactions";
 import ManagerInvoiceDetail from "../pages/Manager/ManagerInvoiceDetail";
 import ManagerTransactionDetail from "../pages/Manager/ManagerTransactionDetail";
-
-// Manager Pages (Already imported via above or handled)
 import ManagerDashboard from '../pages/Manager/ManagerDashboard';
+
+// === IMPORT TỪ TỔNG ĐÀI ADMIN ===
+import { ManageUsers } from "../pages/Admin";
+
+// === IMPORT CỤM AUTH CHUẨN SENIOR ===
+import {
+  LoginPage,
+  RegisterPage,
+  AdminLoginPage,
+  ForgotPasswordPage,
+  ResetPasswordPage
+} from '../pages/auth';
 
 // Component để redirect login/register và mở modal
 const LoginRedirect = () => {
@@ -81,16 +88,72 @@ const RegisterRedirect = () => {
   return <Navigate to="/" replace />;
 };
 
-
-
 const AppRouter = () => {
   return (
     <Router>
       <ScrollToTop />
       <Routes>
-        {/* Routes không có Layout (Manager, Admin, Staff) - đặt trước để match trước */}
 
-        {/* Manager Routes */}
+        {/* ========================================== */}
+        {/* CỤM ROUTES: AUTHENTICATION (XÁC THỰC)      */}
+        {/* ========================================== */}
+
+        {/* Admin Login: Không có Header/Footer */}
+        <Route
+          path="/admin/login"
+          element={
+            <PublicRoute>
+              <AdminLoginPage />
+            </PublicRoute>
+          }
+        />
+
+        {/* Customer Auth: Bọc trong Layout để có Header/Footer */}
+        <Route
+          path="/login"
+          element={
+            <Layout>
+              <PublicRoute>
+                <LoginPage />
+              </PublicRoute>
+            </Layout>
+          }
+        />
+        <Route
+          path="/register"
+          element={
+            <Layout>
+              <PublicRoute>
+                <RegisterPage />
+              </PublicRoute>
+            </Layout>
+          }
+        />
+        <Route
+          path="/forgot-password"
+          element={
+            <Layout>
+              <PublicRoute>
+                <ForgotPasswordPage />
+              </PublicRoute>
+            </Layout>
+          }
+        />
+        <Route
+          path="/reset-password"
+          element={
+            <Layout>
+              <PublicRoute>
+                <ResetPasswordPage />
+              </PublicRoute>
+            </Layout>
+          }
+        />
+
+
+        {/* ========================================== */}
+        {/* CỤM ROUTES: MANAGER                        */}
+        {/* ========================================== */}
         <Route
           path="/manager/dashboard"
           element={
@@ -212,7 +275,9 @@ const AppRouter = () => {
           }
         />
 
-        {/* Staff Routes */}
+        {/* ========================================== */}
+        {/* CỤM ROUTES: STAFF                          */}
+        {/* ========================================== */}
         <Route
           path="/staff/dashboard"
           element={
@@ -334,7 +399,9 @@ const AppRouter = () => {
           }
         />
 
-        {/* Admin Routes */}
+        {/* ========================================== */}
+        {/* CỤM ROUTES: ADMIN                          */}
+        {/* ========================================== */}
         <Route
           path="/admin/dashboard"
           element={
@@ -392,36 +459,14 @@ const AppRouter = () => {
           }
         />
 
-        {/* Routes có Layout (Customer và Public) */}
+        {/* ========================================== */}
+        {/* CỤM ROUTES: CUSTOMER (PUBLIC & PROTECTED)  */}
+        {/* ========================================== */}
         <Route
           path="/"
           element={
             <Layout>
               <Home />
-            </Layout>
-          }
-        />
-        <Route
-          path="/login"
-          element={
-            <Layout>
-              <Login />
-            </Layout>
-          }
-        />
-        <Route
-          path="/register"
-          element={
-            <Layout>
-              <Register />
-            </Layout>
-          }
-        />
-        <Route
-          path="/forgot-password"
-          element={
-            <Layout>
-              <ForgotPassword />
             </Layout>
           }
         />
@@ -442,7 +487,19 @@ const AppRouter = () => {
           }
         />
 
-        {/* Protected Customer Routes */}
+        {/* ===== ĐÃ THÊM ROUTE PROFILE VÀO ĐÂY ===== */}
+        <Route
+          path="/profile"
+          element={
+            <Layout>
+              <PrivateRoute>
+                <UserProfilePage />
+              </PrivateRoute>
+            </Layout>
+          }
+        />
+        {/* ======================================== */}
+
         <Route
           path="/cart"
           element={

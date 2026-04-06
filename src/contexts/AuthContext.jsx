@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { loginApi, registerApi } from '../api/authApi';
+// Import thêm systemLoginApi
+import { loginApi, registerApi, systemLoginApi } from '../api/authApi';
 
 const AuthContext = createContext();
 
@@ -22,11 +23,9 @@ export const AuthProvider = ({ children }) => {
         const storedUser = localStorage.getItem('user');
         const storedToken = localStorage.getItem('token');
 
-        // Chỉ khôi phục user nếu có cả token (đảm bảo tính toàn vẹn)
         if (storedUser && storedToken) {
           setUser(JSON.parse(storedUser));
         } else {
-          // Dọn dẹp rác nếu dữ liệu không đồng bộ
           localStorage.removeItem('user');
           localStorage.removeItem('token');
         }
@@ -40,44 +39,61 @@ export const AuthProvider = ({ children }) => {
     initializeAuth();
   }, []);
 
-  // Đăng nhập bằng API backend thật
+  // --- HÀM HỖ TRỢ XỬ LÝ DỮ LIỆU USER SAU KHI LOGIN ---
+  const handleAuthSuccess = (data) => {
+    const userFromApi = {
+      id: data.accountId,
+      username: data.userName,
+      fullName: data.fullName,
+      image: data.image,
+      role: data.role,
+    };
+
+    if (data.token) {
+      localStorage.setItem('token', data.token);
+    }
+
+    setUser(userFromApi);
+    localStorage.setItem('user', JSON.stringify(userFromApi));
+    return userFromApi;
+  };
+
+  // 1. Đăng nhập Khách hàng (Thường)
   const login = async (username, password) => {
     try {
       const res = await loginApi({ username, password });
 
-      // Kiểm tra cấu trúc response chuẩn từ BE
       if (res?.statusCode !== 200 || res?.code !== 'SUCCESS') {
         return { success: false, message: res?.message || 'Tài khoản hoặc mật khẩu không chính xác' };
       }
 
-      const data = res.data;
-
-      // Chuẩn hóa dữ liệu user trước khi lưu vào State
-      const userFromApi = {
-        id: data.accountId,
-        username: data.userName,
-        fullName: data.fullName,
-        image: data.image,
-        role: data.role,
-      };
-
-      // Lưu Token để Axios Interceptor sử dụng cho các request sau
-      if (data.token) {
-        localStorage.setItem('token', data.token);
-      }
-
-      // Lưu thông tin User
-      setUser(userFromApi);
-      localStorage.setItem('user', JSON.stringify(userFromApi));
-
-      return { success: true, user: userFromApi };
+      const userObj = handleAuthSuccess(res.data);
+      return { success: true, user: userObj };
     } catch (error) {
       const message = error.response?.data?.message || 'Lỗi kết nối máy chủ. Vui lòng thử lại sau.';
       return { success: false, message };
     }
   };
 
-  // Đăng ký bằng API backend
+  // 2. Đăng nhập Hệ thống (Admin / Manager / Staff)
+  const systemLogin = async (username, password) => {
+    try {
+      const res = await systemLoginApi({ username, password });
+
+      // Lưu ý: Kiểm tra statusCode và code theo đúng format của Backend system-login
+      if (res?.statusCode !== 200 || res?.code !== 'SUCCESS') {
+        return { success: false, message: res?.message || 'Thông tin quản trị không chính xác' };
+      }
+
+      const userObj = handleAuthSuccess(res.data);
+      return { success: true, user: userObj };
+    } catch (error) {
+      const message = error.response?.data?.message || 'Lỗi đăng nhập hệ thống quản trị.';
+      return { success: false, message };
+    }
+  };
+
+  // 3. Đăng ký
   const register = async ({ username, password, fullName, email, contactPhone }) => {
     try {
       const res = await registerApi({ username, password, fullName, email, contactPhone });
@@ -93,32 +109,31 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Đăng xuất và dọn dẹp sạch sẽ LocalStorage
+  // 4. Đăng xuất
   const logout = () => {
     setUser(null);
     localStorage.removeItem('user');
     localStorage.removeItem('token');
   };
 
-  // API Quên mật khẩu (Chờ BE cung cấp)
   const forgotPassword = async () => {
     return { success: true, message: 'Tính năng đang được phát triển' };
   };
 
-  // Chuẩn hóa chuỗi Role để so sánh (tránh lỗi viết hoa/thường từ DB)
+  // Chuẩn hóa chuỗi Role
   const normalizedRole = user?.role?.toLowerCase() || '';
 
   const value = {
     user,
     login,
+    systemLogin, // Đưa systemLogin vào value để AdminLogin.jsx có thể gọi
     register,
     logout,
     forgotPassword,
     loading,
     isAuthenticated: !!user,
-    // Phân quyền chuẩn bị cho PrivateRoute
     isCustomer: normalizedRole === 'customer',
-    isEmployee: normalizedRole === 'employee' || normalizedRole === 'staff',
+    isEmployee: ['employee', 'staff'].includes(normalizedRole),
     isAdmin: normalizedRole === 'admin',
     isManager: normalizedRole === 'manager',
   };
