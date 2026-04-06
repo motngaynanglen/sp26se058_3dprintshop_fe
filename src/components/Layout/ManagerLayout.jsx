@@ -22,6 +22,11 @@ const ManagerLayout = ({ children }) => {
       icon: '📊'
     },
     {
+      path: '/manager/orders',
+      label: 'Quản lý đơn hàng',
+      icon: '🛒'
+    },
+    {
       path: '/manager/products',
       label: 'Quản lý sản phẩm',
       icon: '📦'
@@ -45,6 +50,11 @@ const ManagerLayout = ({ children }) => {
       path: '/manager/feedback',
       label: 'Phản hồi',
       icon: '💬'
+    },
+    {
+      path: '/manager/inventory',
+      label: 'Quản lý kho',
+      icon: '🏭'
     },
     {
       path: '/manager/invoices',

@@ -57,6 +57,8 @@ import ManagerInvoices from "../pages/Manager/ManagerInvoices";
 import ManagerTransactions from "../pages/Manager/ManagerTransactions";
 import ManagerInvoiceDetail from "../pages/Manager/ManagerInvoiceDetail";
 import ManagerTransactionDetail from "../pages/Manager/ManagerTransactionDetail";
+import ManageInventory from "../pages/Manager/ManageInventory";
+import ManageOrders from "../pages/Manager/ManageOrders";
 import ManagerDashboard from '../pages/Manager/ManagerDashboard';
 
 // === IMPORT TỪ TỔNG ĐÀI ADMIN ===
@@ -270,6 +272,26 @@ const AppRouter = () => {
             <PrivateRoute requiredRole={['manager', 'admin']}>
               <ManagerLayout>
                 <ManagerTransactionDetail />
+              </ManagerLayout>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/manager/inventory"
+          element={
+            <PrivateRoute requiredRole={['manager', 'admin']}>
+              <ManagerLayout>
+                <ManageInventory />
+              </ManagerLayout>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/manager/orders"
+          element={
+            <PrivateRoute requiredRole={['manager', 'admin']}>
+              <ManagerLayout>
+                <ManageOrders />
               </ManagerLayout>
             </PrivateRoute>
           }

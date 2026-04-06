@@ -1,272 +1,145 @@
-import React, { useState, useMemo } from 'react';
-import { 
-  Table, 
-  Input, 
-  Select, 
-  Button, 
-  Modal, 
-  Avatar, 
-  Rate, 
-  Tag, 
-  Space, 
-  Card, 
-  Row, 
-  Col, 
-  Statistic,
-  Empty,
-  Tooltip,
-  Image
+import React, { useState, useEffect } from 'react';
+import {
+  Table, Input, Select, Button, Modal, Avatar, Rate, Tag, Space, Card, Row, Col,
+  Statistic, Empty, Tooltip, Image, Form, Typography, message
 } from 'antd';
 import {
-  SearchOutlined,
-  EyeOutlined,
-  MessageOutlined,
-  ShoppingOutlined,
-  UserOutlined,
-  StarFilled,
-  TrophyOutlined,
-  SmileOutlined,
-  RiseOutlined
+  SearchOutlined, EyeOutlined, MessageOutlined, DeleteOutlined, StarFilled,
+  ReloadOutlined, StopOutlined, CheckCircleOutlined, RiseOutlined, SmileOutlined
 } from '@ant-design/icons';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import feedbackApi from '../../api/feedbackApi';
 
-const { Search } = Input;
+const { TextArea } = Input;
 const { Option } = Select;
+const { confirm } = Modal;
+const { Title, Text } = Typography;
 
 const FeedbackList = () => {
-  // State management
+  const [feedbacks, setFeedbacks] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [ratingFilter, setRatingFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('newest');
+  const [ratingFilter, setRatingFilter] = useState(null);
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
+
   const [selectedFeedback, setSelectedFeedback] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isReplyModalOpen, setIsReplyModalOpen] = useState(false);
+  const [replyText, setReplyText] = useState('');
+  const [replying, setReplying] = useState(false);
 
-  // Mock data - Feedback theo sản phẩm/biến thể
-  const feedbacks = [
-    {
-      id: 1,
-      customer: {
-        name: 'Nguyễn Văn An',
-        email: 'nguyenvanan@gmail.com',
-        phone: '0123456789',
-        avatar: 'https://i.pravatar.cc/150?img=1',
-        zaloPhone: '0123456789'
-      },
-      product: {
-        id: 'PROD-001',
-        name: 'Mô hình 3D Custom Logo Công ty',
-        variant: 'Màu đỏ - Kích thước L (20cm)',
-        image: 'https://via.placeholder.com/100',
-        price: 500000
-      },
-      orderId: 'ORD-001',
-      rating: 5,
-      comment: 'Sản phẩm rất đẹp, chất lượng in tốt, màu sắc chuẩn. Nhân viên tư vấn nhiệt tình. Sẽ ủng hộ shop lâu dài!',
-      images: ['https://via.placeholder.com/300'],
-      date: '2024-01-20T10:30:00Z'
-    },
-    {
-      id: 2,
-      customer: {
-        name: 'Trần Thị Bình',
-        email: 'tranthib@gmail.com',
-        phone: '0987654321',
-        avatar: 'https://i.pravatar.cc/150?img=5',
-        zaloPhone: '0987654321'
-      },
-      product: {
-        id: 'PROD-002',
-        name: 'Phụ kiện điện thoại in 3D',
-        variant: 'Màu xanh - Kích thước M',
-        image: 'https://via.placeholder.com/100',
-        price: 150000
-      },
-      orderId: 'ORD-002',
-      rating: 4,
-      comment: 'Sản phẩm tốt, đúng mô tả. Thời gian giao hàng nhanh.',
-      images: [],
-      date: '2024-01-19T14:20:00Z'
-    },
-    {
-      id: 3,
-      customer: {
-        name: 'Lê Minh Cường',
-        email: 'leminhcuong@gmail.com',
-        phone: '0369852147',
-        avatar: 'https://i.pravatar.cc/150?img=8',
-        zaloPhone: '0369852147'
-      },
-      product: {
-        id: 'PROD-003',
-        name: 'Mô hình nhân vật Anime',
-        variant: 'Cao 15cm - Màu đa sắc',
-        image: 'https://via.placeholder.com/100',
-        price: 800000
-      },
-      orderId: 'ORD-003',
-      rating: 3,
-      comment: 'Sản phẩm ổn nhưng có một số chi tiết chưa sắc nét lắm.',
-      images: [],
-      date: '2024-01-18T09:15:00Z'
-    },
-    {
-      id: 4,
-      customer: {
-        name: 'Phạm Thu Hà',
-        email: 'phamthuha@gmail.com',
-        phone: '0912345678',
-        avatar: 'https://i.pravatar.cc/150?img=9',
-        zaloPhone: '0912345678'
-      },
-      product: {
-        id: 'PROD-004',
-        name: 'Đồ chơi giáo dục in 3D',
-        variant: 'Bộ 5 món - Nhiều màu',
-        image: 'https://via.placeholder.com/100',
-        price: 350000
-      },
-      orderId: 'ORD-004',
-      rating: 5,
-      comment: 'Con rất thích! Chất liệu an toàn, không mùi. Cảm ơn shop!',
-      images: ['https://via.placeholder.com/300', 'https://via.placeholder.com/300'],
-      date: '2024-01-17T16:45:00Z'
-    },
-    {
-      id: 5,
-      customer: {
-        name: 'Hoàng Văn Đức',
-        email: 'hoangvanduc@gmail.com',
-        phone: '0778899001',
-        avatar: 'https://i.pravatar.cc/150?img=12',
-        zaloPhone: '0778899001'
-      },
-      product: {
-        id: 'PROD-005',
-        name: 'Khuôn bánh in 3D',
-        variant: 'Hình trái tim - Size S',
-        image: 'https://via.placeholder.com/100',
-        price: 200000
-      },
-      orderId: null, // Không có order ID
-      rating: 2,
-      comment: 'Khuôn hơi mỏng, dễ bị cong khi dùng. Cần cải thiện độ dày.',
-      images: [],
-      date: '2024-01-16T11:00:00Z'
+  useEffect(() => {
+    fetchFeedbacks(1);
+  }, []);
+
+  const fetchFeedbacks = async (page = 1, search = searchQuery, rating = ratingFilter) => {
+    setLoading(true);
+    try {
+      const res = await feedbackApi.query({
+        search: search || '',
+        rating: rating || null,
+        pageNumber: page,
+        pageSize: pagination.pageSize,
+      });
+      const list = res?.data || [];
+      setFeedbacks(list);
+      setPagination(prev => ({
+        ...prev,
+        current: page,
+        total: res?.additionalData?.paging?.totalCount || list.length,
+      }));
+    } catch (err) {
+      message.error('Không thể tải danh sách feedback');
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
-  // Filtering and sorting
-  const filteredAndSortedFeedbacks = useMemo(() => {
-    let result = feedbacks;
+  const handleSearch = () => fetchFeedbacks(1, searchQuery, ratingFilter);
 
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(fb =>
-        fb.customer.name.toLowerCase().includes(query) ||
-        fb.product.name.toLowerCase().includes(query) ||
-        (fb.orderId && fb.orderId.toLowerCase().includes(query))
-      );
+  const handleReset = () => {
+    setSearchQuery('');
+    setRatingFilter(null);
+    fetchFeedbacks(1, '', null);
+  };
+
+  const handleViewDetails = (record) => {
+    setSelectedFeedback(record);
+    setIsDetailModalOpen(true);
+  };
+
+  const handleOpenReply = (record) => {
+    setSelectedFeedback(record);
+    setReplyText(record.replyContent || '');
+    setIsReplyModalOpen(true);
+  };
+
+  const handleReply = async () => {
+    if (!replyText.trim()) { message.warning('Vui lòng nhập nội dung phản hồi'); return; }
+    setReplying(true);
+    try {
+      await feedbackApi.reply(selectedFeedback.id, replyText);
+      message.success('Đã gửi phản hồi thành công!');
+      setIsReplyModalOpen(false);
+      fetchFeedbacks(pagination.current);
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Phản hồi thất bại');
+    } finally {
+      setReplying(false);
     }
+  };
 
-    // Rating filter
-    if (ratingFilter !== 'all') {
-      result = result.filter(fb => fb.rating === parseInt(ratingFilter));
+  const handleToggleStatus = async (record) => {
+    try {
+      await feedbackApi.toggleStatus(record.id);
+      message.success(record.isHidden ? 'Đã hiện feedback' : 'Đã ẩn feedback');
+      fetchFeedbacks(pagination.current);
+    } catch (err) {
+      message.error('Thao tác thất bại');
     }
+  };
 
-    // Sort
-    result = [...result].sort((a, b) => {
-      switch (sortBy) {
-        case 'newest':
-          return new Date(b.date) - new Date(a.date);
-        case 'oldest':
-          return new Date(a.date) - new Date(b.date);
-        case 'rating-high':
-          return b.rating - a.rating;
-        case 'rating-low':
-          return a.rating - b.rating;
-        default:
-          return 0;
+  const handleDelete = (record) => {
+    confirm({
+      title: 'Xóa feedback này?',
+      content: 'Hành động này không thể hoàn tác.',
+      okText: 'Xóa',
+      okType: 'danger',
+      cancelText: 'Hủy',
+      onOk: async () => {
+        try {
+          await feedbackApi.delete(record.id);
+          message.success('Đã xóa feedback');
+          fetchFeedbacks(pagination.current);
+        } catch (err) {
+          message.error(err?.response?.data?.message || 'Xóa thất bại');
+        }
       }
     });
-
-    return result;
-  }, [feedbacks, searchQuery, ratingFilter, sortBy]);
-
-  // Statistics calculation
-  const stats = useMemo(() => {
-    const total = feedbacks.length;
-    const avgRating = total > 0 
-      ? (feedbacks.reduce((sum, fb) => sum + fb.rating, 0) / total).toFixed(1)
-      : 0;
-    
-    const distribution = [5, 4, 3, 2, 1].map(rating => ({
-      rating,
-      count: feedbacks.filter(fb => fb.rating === rating).length,
-      percentage: total > 0 
-        ? ((feedbacks.filter(fb => fb.rating === rating).length / total) * 100).toFixed(0)
-        : 0
-    }));
-
-    const recentCount = feedbacks.filter(fb =>
-      new Date(fb.date) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-    ).length;
-
-    const satisfactionRate = total > 0
-      ? ((feedbacks.filter(fb => fb.rating >= 4).length / total) * 100).toFixed(0)
-      : 0;
-
-    return { total, avgRating, distribution, recentCount, satisfactionRate };
-  }, [feedbacks]);
-
-  // Handlers
-  const handleViewDetails = (feedback) => {
-    setSelectedFeedback(feedback);
-    setIsModalOpen(true);
   };
 
-  const handleContactZalo = (phone) => {
-    // Open Zalo chat
-    window.open(`https://zalo.me/${phone}`, '_blank');
-  };
+  // -- Stats từ data đang load
+  const total = pagination.total;
+  const avgRating = feedbacks.length > 0
+    ? (feedbacks.reduce((s, f) => s + (f.rating || 0), 0) / feedbacks.length).toFixed(1)
+    : 0;
+  const satisfactionRate = feedbacks.length > 0
+    ? ((feedbacks.filter(f => f.rating >= 4).length / feedbacks.length) * 100).toFixed(0)
+    : 0;
 
-  const handleViewProduct = (productId) => {
-    // Navigate to product detail page
-    window.location.href = `/products/${productId}`;
-  };
-
-  // Table columns
   const columns = [
     {
       title: 'Khách hàng',
-      dataIndex: 'customer',
-      key: 'customer',
-      width: 200,
-      render: (customer) => (
+      dataIndex: 'customerName',
+      key: 'customerName',
+      width: 160,
+      render: (name, record) => (
         <Space>
-          <Avatar src={customer.avatar} icon={<UserOutlined />} />
+          <Avatar icon={<MessageOutlined />} />
           <div>
-            <div className="font-medium text-gray-900">{customer.name}</div>
-            <div className="text-xs text-gray-500">{customer.phone}</div>
-          </div>
-        </Space>
-      ),
-    },
-    {
-      title: 'Sản phẩm',
-      dataIndex: 'product',
-      key: 'product',
-      width: 300,
-      render: (product) => (
-        <Space>
-          <Avatar src={product.image} shape="square" size={50} icon={<ShoppingOutlined />} />
-          <div>
-            <div className="font-medium text-gray-900">{product.name}</div>
-            <div className="text-xs text-gray-500">{product.variant}</div>
-            <div className="text-xs text-indigo-600 font-semibold">
-              {product.price.toLocaleString('vi-VN')} đ
-            </div>
+            <div className="font-medium">{name || '—'}</div>
+            <div className="text-xs text-gray-500">{record.customerPhone || ''}</div>
           </div>
         </Space>
       ),
@@ -275,67 +148,65 @@ const FeedbackList = () => {
       title: 'Đánh giá',
       dataIndex: 'rating',
       key: 'rating',
-      width: 120,
+      width: 130,
       align: 'center',
       render: (rating) => (
         <div>
-          <Rate disabled value={rating} style={{ fontSize: 16 }} />
-          <div className="text-sm font-semibold text-gray-700 mt-1">{rating}/5</div>
+          <Rate disabled value={rating} style={{ fontSize: 14 }} />
+          <div className="text-xs font-semibold">{rating}/5</div>
         </div>
       ),
     },
     {
       title: 'Nội dung',
-      dataIndex: 'comment',
-      key: 'comment',
+      dataIndex: 'content',
+      key: 'content',
       ellipsis: true,
-      render: (comment) => (
-        <Tooltip title={comment}>
-          <div className="text-gray-600">{comment}</div>
+      render: (text) => (
+        <Tooltip title={text}>
+          <span className="text-gray-600">{text}</span>
         </Tooltip>
+      ),
+    },
+    {
+      title: 'Trạng thái',
+      dataIndex: 'isHidden',
+      key: 'isHidden',
+      width: 110,
+      render: (isHidden) => (
+        <Tag color={isHidden ? 'red' : 'green'}>{isHidden ? 'Đã ẩn' : 'Hiển thị'}</Tag>
       ),
     },
     {
       title: 'Ngày gửi',
-      dataIndex: 'date',
-      key: 'date',
-      width: 150,
-      render: (date) => (
-        <Tooltip title={format(new Date(date), 'dd/MM/yyyy HH:mm', { locale: vi })}>
-          <div className="text-gray-600">
-            {formatDistanceToNow(new Date(date), { addSuffix: true, locale: vi })}
-          </div>
-        </Tooltip>
-      ),
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      width: 120,
+      render: (date) => date ? format(new Date(date), 'dd/MM/yyyy', { locale: vi }) : '—',
     },
     {
-      title: 'Hành động',
+      title: 'Thao tác',
       key: 'actions',
-      width: 180,
+      width: 160,
       fixed: 'right',
       render: (_, record) => (
         <Space size="small">
           <Tooltip title="Xem chi tiết">
+            <Button type="text" icon={<EyeOutlined />} onClick={() => handleViewDetails(record)} />
+          </Tooltip>
+          <Tooltip title="Phản hồi">
+            <Button type="text" icon={<MessageOutlined />} onClick={() => handleOpenReply(record)} style={{ color: '#6366f1' }} />
+          </Tooltip>
+          <Tooltip title={record.isHidden ? 'Hiện feedback' : 'Ẩn feedback'}>
             <Button
               type="text"
-              icon={<EyeOutlined />}
-              onClick={() => handleViewDetails(record)}
+              icon={record.isHidden ? <CheckCircleOutlined /> : <StopOutlined />}
+              onClick={() => handleToggleStatus(record)}
+              style={{ color: record.isHidden ? '#10b981' : '#f59e0b' }}
             />
           </Tooltip>
-          <Tooltip title="Liên hệ Zalo">
-            <Button
-              type="text"
-              icon={<MessageOutlined />}
-              onClick={() => handleContactZalo(record.customer.zaloPhone)}
-              style={{ color: '#0068FF' }}
-            />
-          </Tooltip>
-          <Tooltip title="Xem sản phẩm">
-            <Button
-              type="text"
-              icon={<ShoppingOutlined />}
-              onClick={() => handleViewProduct(record.product.id)}
-            />
+          <Tooltip title="Xóa">
+            <Button type="text" danger icon={<DeleteOutlined />} onClick={() => handleDelete(record)} />
           </Tooltip>
         </Space>
       ),
@@ -344,301 +215,159 @@ const FeedbackList = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Phản hồi khách hàng</h1>
-          <p className="text-gray-500 mt-1">Quản lý và theo dõi đánh giá sản phẩm từ khách hàng</p>
-        </div>
+      <div className="mb-6">
+        <Title level={3} style={{ margin: 0 }}>Phản hồi khách hàng</Title>
+        <Text type="secondary">Quản lý và theo dõi đánh giá từ khách hàng</Text>
+      </div>
 
-        {/* Statistics Cards */}
-        <Row gutter={[16, 16]} className="mb-6">
-          <Col xs={24} sm={12} lg={6}>
-            <Card>
-              <Statistic
-                title="Tổng feedback"
-                value={stats.total}
-                prefix={<MessageOutlined style={{ color: '#6366F1' }} />}
-                valueStyle={{ color: '#6366F1' }}
-              />
-            </Card>
+      {/* Stats */}
+      <Row gutter={[16, 16]} className="mb-6">
+        <Col xs={24} sm={8}>
+          <Card>
+            <Statistic title="Tổng feedback" value={total} prefix={<MessageOutlined style={{ color: '#6366F1' }} />} valueStyle={{ color: '#6366F1' }} />
+          </Card>
+        </Col>
+        <Col xs={24} sm={8}>
+          <Card>
+            <Statistic title="Đánh giá TB (trang này)" value={avgRating} suffix="/ 5" prefix={<StarFilled style={{ color: '#F59E0B' }} />} valueStyle={{ color: '#F59E0B' }} />
+          </Card>
+        </Col>
+        <Col xs={24} sm={8}>
+          <Card>
+            <Statistic title="Tỷ lệ hài lòng (≥4★)" value={satisfactionRate} suffix="%" prefix={<SmileOutlined style={{ color: '#8B5CF6' }} />} valueStyle={{ color: '#8B5CF6' }} />
+          </Card>
+        </Col>
+      </Row>
+
+      {/* Filters */}
+      <Card className="mb-4">
+        <Row gutter={12} align="middle">
+          <Col flex="auto">
+            <Input
+              placeholder="Tìm kiếm theo khách hàng, nội dung..."
+              prefix={<SearchOutlined />}
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              onPressEnter={handleSearch}
+              allowClear
+            />
           </Col>
-          <Col xs={24} sm={12} lg={6}>
-            <Card>
-              <Statistic
-                title="Đánh giá trung bình"
-                value={stats.avgRating}
-                suffix="/ 5"
-                prefix={<StarFilled style={{ color: '#F59E0B' }} />}
-                valueStyle={{ color: '#F59E0B' }}
-              />
-            </Card>
+          <Col>
+            <Select
+              placeholder="Lọc theo sao"
+              style={{ width: 150 }}
+              allowClear
+              value={ratingFilter}
+              onChange={v => { setRatingFilter(v); fetchFeedbacks(1, searchQuery, v); }}
+            >
+              {[5, 4, 3, 2, 1].map(s => (
+                <Option key={s} value={s}>{s} ⭐</Option>
+              ))}
+            </Select>
           </Col>
-          <Col xs={24} sm={12} lg={6}>
-            <Card>
-              <Statistic
-                title="Feedback mới (7 ngày)"
-                value={stats.recentCount}
-                prefix={<RiseOutlined style={{ color: '#10B981' }} />}
-                valueStyle={{ color: '#10B981' }}
-              />
-            </Card>
+          <Col>
+            <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>Tìm kiếm</Button>
           </Col>
-          <Col xs={24} sm={12} lg={6}>
-            <Card>
-              <Statistic
-                title="Tỷ lệ hài lòng"
-                value={stats.satisfactionRate}
-                suffix="%"
-                prefix={<SmileOutlined style={{ color: '#8B5CF6' }} />}
-                valueStyle={{ color: '#8B5CF6' }}
-              />
-            </Card>
+          <Col>
+            <Button icon={<ReloadOutlined />} onClick={handleReset}>Làm mới</Button>
           </Col>
         </Row>
+      </Card>
 
-        {/* Rating Distribution */}
-        <Card className="mb-6" title="Phân bố đánh giá">
-          <div className="space-y-3">
-            {stats.distribution.map(({ rating, count, percentage }) => (
-              <div key={rating} className="flex items-center gap-3">
-                <div className="w-16 text-sm font-medium text-gray-700">
-                  {rating} <StarFilled className="text-yellow-400" />
-                </div>
-                <div className="flex-1">
-                  <div className="bg-gray-200 rounded-full h-6 overflow-hidden">
-                    <div
-                      className="bg-gradient-to-r from-yellow-400 to-orange-500 h-full flex items-center justify-end px-2 transition-all duration-300"
-                      style={{ width: `${percentage}%` }}
-                    >
-                      {percentage > 10 && (
-                        <span className="text-xs font-semibold text-white">
-                          {percentage}%
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <div className="w-12 text-sm text-gray-600 text-right">{count}</div>
+      {/* Table */}
+      <Card>
+        <Table
+          rowKey="id"
+          columns={columns}
+          dataSource={feedbacks}
+          loading={loading}
+          scroll={{ x: 1000 }}
+          pagination={{
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total: pagination.total,
+            showSizeChanger: false,
+            showTotal: t => `Tổng ${t} feedback`,
+            onChange: page => fetchFeedbacks(page),
+          }}
+          locale={{ emptyText: <Empty description="Không có feedback nào" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
+        />
+      </Card>
+
+      {/* Detail Modal */}
+      <Modal
+        title="Chi tiết phản hồi"
+        open={isDetailModalOpen}
+        onCancel={() => setIsDetailModalOpen(false)}
+        footer={[
+          <Button key="reply" type="primary" icon={<MessageOutlined />} onClick={() => { setIsDetailModalOpen(false); handleOpenReply(selectedFeedback); }}>
+            Phản hồi
+          </Button>,
+          <Button key="close" onClick={() => setIsDetailModalOpen(false)}>Đóng</Button>,
+        ]}
+        width={640}
+      >
+        {selectedFeedback && (
+          <div className="space-y-4 mt-4">
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="font-semibold text-gray-900">{selectedFeedback.customerName}</div>
+              <div className="text-sm text-gray-500">{selectedFeedback.customerPhone}</div>
+            </div>
+            <div>
+              <Rate disabled value={selectedFeedback.rating} />
+              <span className="ml-2 font-semibold">{selectedFeedback.rating}/5</span>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="text-sm font-semibold text-gray-700 mb-1">💬 Nội dung:</div>
+              <div className="text-gray-900">{selectedFeedback.content}</div>
+            </div>
+            {selectedFeedback.replyContent && (
+              <div className="bg-indigo-50 p-4 rounded-lg border-l-4 border-indigo-400">
+                <div className="text-sm font-semibold text-indigo-700 mb-1">✉️ Phản hồi của cửa hàng:</div>
+                <div className="text-gray-800">{selectedFeedback.replyContent}</div>
               </div>
-            ))}
-          </div>
-        </Card>
-
-        {/* Filters */}
-        <Card className="mb-6">
-          <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-            <Search
-              placeholder="Tìm kiếm khách hàng, tên sản phẩm..."
-              allowClear
-              enterButton={<SearchOutlined />}
-              size="large"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onSearch={setSearchQuery}
-            />
-            <Row gutter={16}>
-              <Col xs={24} md={12}>
-                <Space>
-                  <span className="text-gray-700 font-medium">Đánh giá:</span>
-                  <Select
-                    value={ratingFilter}
-                    onChange={setRatingFilter}
-                    style={{ width: 200 }}
-                  >
-                    <Option value="all">Tất cả</Option>
-                    <Option value="5">5 ⭐</Option>
-                    <Option value="4">4 ⭐</Option>
-                    <Option value="3">3 ⭐</Option>
-                    <Option value="2">2 ⭐</Option>
-                    <Option value="1">1 ⭐</Option>
-                  </Select>
-                </Space>
-              </Col>
-              <Col xs={24} md={12}>
-                <Space>
-                  <span className="text-gray-700 font-medium">Sắp xếp:</span>
-                  <Select value={sortBy} onChange={setSortBy} style={{ width: 200 }}>
-                    <Option value="newest">Mới nhất</Option>
-                    <Option value="oldest">Cũ nhất</Option>
-                    <Option value="rating-high">Rating cao nhất</Option>
-                    <Option value="rating-low">Rating thấp nhất</Option>
-                  </Select>
-                </Space>
-              </Col>
-            </Row>
-          </Space>
-        </Card>
-
-        {/* Table */}
-        <Card>
-          <Table
-            columns={columns}
-            dataSource={filteredAndSortedFeedbacks}
-            rowKey="id"
-            pagination={{
-              pageSize: 10,
-              showSizeChanger: true,
-              showTotal: (total) => `Tổng ${total} feedback`,
-            }}
-            locale={{
-              emptyText: (
-                <Empty
-                  description="Không có feedback nào"
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                />
-              ),
-            }}
-            scroll={{ x: 1200 }}
-          />
-        </Card>
-
-        {/* Detail Modal */}
-        <Modal
-          title="Chi tiết phản hồi"
-          open={isModalOpen}
-          onCancel={() => setIsModalOpen(false)}
-          footer={[
-            <Button
-              key="zalo"
-              type="primary"
-              icon={<MessageOutlined />}
-              onClick={() => handleContactZalo(selectedFeedback?.customer.zaloPhone)}
-              style={{ backgroundColor: '#0068FF' }}
-            >
-              Liên hệ Zalo
-            </Button>,
-            <Button key="close" onClick={() => setIsModalOpen(false)}>
-              Đóng
-            </Button>,
-          ]}
-          width={700}
-        >
-          {selectedFeedback && (
-            <div className="space-y-6">
-              {/* Customer Info */}
+            )}
+            {selectedFeedback.imageUrls?.length > 0 && (
               <div>
-                <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                  <UserOutlined /> Thông tin khách hàng
-                </h3>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <Space direction="vertical" size="small">
-                    <div className="flex items-center gap-3">
-                      <Avatar src={selectedFeedback.customer.avatar} size={50} />
-                      <div>
-                        <div className="font-semibold text-gray-900">
-                          {selectedFeedback.customer.name}
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          {selectedFeedback.customer.email}
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          📞 {selectedFeedback.customer.phone}
-                        </div>
-                      </div>
-                    </div>
+                <div className="text-sm font-semibold mb-2">📷 Hình ảnh:</div>
+                <Image.PreviewGroup>
+                  <Space wrap>
+                    {selectedFeedback.imageUrls.map((img, i) => (
+                      <Image key={i} src={img} width={80} height={80} style={{ objectFit: 'cover', borderRadius: 6 }} />
+                    ))}
                   </Space>
-                </div>
+                </Image.PreviewGroup>
               </div>
+            )}
+          </div>
+        )}
+      </Modal>
 
-              {/* Product Info */}
-              <div>
-                <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                  <ShoppingOutlined /> Sản phẩm được đánh giá
-                </h3>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="flex gap-4">
-                    <Avatar
-                      src={selectedFeedback.product.image}
-                      shape="square"
-                      size={80}
-                      icon={<ShoppingOutlined />}
-                    />
-                    <div className="flex-1">
-                      <div className="font-semibold text-gray-900 mb-1">
-                        {selectedFeedback.product.name}
-                      </div>
-                      <div className="text-sm text-gray-600 mb-1">
-                        Biến thể: {selectedFeedback.product.variant}
-                      </div>
-                      <div className="text-lg font-bold text-indigo-600">
-                        {selectedFeedback.product.price.toLocaleString('vi-VN')} đ
-                      </div>
-                      <Button
-                        type="link"
-                        onClick={() => handleViewProduct(selectedFeedback.product.id)}
-                        className="p-0 mt-2"
-                      >
-                        Xem chi tiết sản phẩm →
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Order Info (if exists) */}
-              {selectedFeedback.orderId && (
-                <div>
-                  <h3 className="text-lg font-semibold mb-3">📝 Đơn hàng liên quan</h3>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <div className="text-sm">
-                      <span className="text-gray-600">Mã đơn hàng: </span>
-                      <span className="font-semibold text-gray-900">
-                        {selectedFeedback.orderId}
-                      </span>
-                    </div>
-                    <div className="text-sm mt-1">
-                      <span className="text-gray-600">Ngày đặt: </span>
-                      <span className="text-gray-900">
-                        {format(new Date(selectedFeedback.date), 'dd/MM/yyyy', { locale: vi })}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Rating & Comment */}
-              <div>
-                <h3 className="text-lg font-semibold mb-3">⭐ Đánh giá</h3>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <Rate disabled value={selectedFeedback.rating} style={{ fontSize: 24 }} />
-                  <div className="text-2xl font-bold text-gray-900 mt-2">
-                    {selectedFeedback.rating}/5
-                  </div>
-                  <div className="mt-4">
-                    <div className="text-sm font-semibold text-gray-700 mb-2">
-                      💬 Nội dung feedback:
-                    </div>
-                    <div className="text-gray-900 leading-relaxed">
-                      {selectedFeedback.comment}
-                    </div>
-                  </div>
-                  {selectedFeedback.images && selectedFeedback.images.length > 0 && (
-                    <div className="mt-4">
-                      <div className="text-sm font-semibold text-gray-700 mb-2">
-                        📷 Hình ảnh từ khách hàng:
-                      </div>
-                      <Image.PreviewGroup>
-                        <Space>
-                          {selectedFeedback.images.map((img, idx) => (
-                            <Image
-                              key={idx}
-                              src={img}
-                              width={100}
-                              height={100}
-                              style={{ objectFit: 'cover', borderRadius: 8 }}
-                            />
-                          ))}
-                        </Space>
-                      </Image.PreviewGroup>
-                    </div>
-                  )}
-                </div>
-              </div>
+      {/* Reply Modal */}
+      <Modal
+        title="Phản hồi feedback"
+        open={isReplyModalOpen}
+        onOk={handleReply}
+        onCancel={() => setIsReplyModalOpen(false)}
+        okText="Gửi phản hồi"
+        cancelText="Hủy"
+        confirmLoading={replying}
+      >
+        <div className="mt-4">
+          {selectedFeedback && (
+            <div className="bg-gray-50 p-3 rounded mb-4 text-sm text-gray-700">
+              <Rate disabled value={selectedFeedback.rating} style={{ fontSize: 14 }} />
+              <div className="mt-1">{selectedFeedback.content}</div>
             </div>
           )}
-        </Modal>
-      </div>
+          <TextArea
+            rows={5}
+            placeholder="Nhập nội dung phản hồi..."
+            value={replyText}
+            onChange={e => setReplyText(e.target.value)}
+          />
+        </div>
+      </Modal>
     </div>
   );
 };
