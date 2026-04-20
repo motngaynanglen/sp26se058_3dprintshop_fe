@@ -8,7 +8,7 @@ import {
 } from '@ant-design/icons';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import orderApi from '../../api/orderApi';
+import { queryOrdersApi, getOrderDetailApi, cancelOrderApi } from '../../api/orderApi';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -54,7 +54,7 @@ const ManageOrders = () => {
       if (search?.trim()) params.search = search.trim();
       if (status) params.status = status;
 
-      const res = await orderApi.query(params);
+      const res = await queryOrdersApi(params);
       const list = res?.data || [];
       setOrders(list);
       setPagination(prev => ({
@@ -79,7 +79,7 @@ const ManageOrders = () => {
     setIsDetailOpen(true);
     setDetailLoading(true);
     try {
-      const res = await orderApi.getDetail(record.id);
+      const res = await getOrderDetailApi(record.id);
       setSelectedOrder(res?.data || res);
     } catch {
       message.error('Không thể tải chi tiết đơn hàng');
@@ -99,7 +99,7 @@ const ManageOrders = () => {
       cancelText: 'Đóng',
       onOk: async () => {
         try {
-          await orderApi.cancel(record.id);
+          await cancelOrderApi(record.id);
           message.success('Đã hủy đơn hàng thành công');
           fetchOrders(pagination.current);
           // Cập nhật detail nếu đang mở
