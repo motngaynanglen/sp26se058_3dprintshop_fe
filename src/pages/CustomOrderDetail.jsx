@@ -1,366 +1,455 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Breadcrumb } from 'antd';
-import { useOrder } from '../contexts/OrderContext';
-
-// SVG Icons
-const DocumentIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-indigo-500">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
-  </svg>
-);
-
-const EyeIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-  </svg>
-);
-
-const ArrowDownTrayIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-  </svg>
-);
-
-const CheckCircleSolidIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-    <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" />
-  </svg>
-);
-
-const BeakerIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15M14.25 3.104c.251.023.501.05.75.082M19.8 15a2.25 2.25 0 0 1 .45 1.348V19.5a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25v-3.152c0-.486.178-.95.45-1.348L5 14.5m14.8.5-7.4-7.4M5 14.5l7.4-7.4" />
-  </svg>
-);
+import { Spin, message, Modal, Input, Button } from 'antd';
+import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
+import { getDesignRequestDetail, approveQuote, cancelDesignRequest, postDesignRequestMessage } from '../api/mainflow2Api';
+import { useAuth } from '../contexts/AuthContext';
 
 const CUSTOM_STATUS_STEPS = [
-  { key: 'submitted', label: 'Đã gửi yêu cầu' },
-  { key: 'designing', label: 'Đang thiết kế' },
-  { key: 'ready_for_preview', label: 'Sẵn sàng xem trước' },
-  { key: 'pending_approval', label: 'Chờ duyệt & Thanh toán' },
-  { key: 'printing', label: 'Đang in' },
-  { key: 'completed', label: 'Hoàn thành' },
+  { key: 'SUBMITTED', label: 'Gửi yêu cầu' },
+  { key: 'ASSIGNED', label: 'NV đã nhận' },
+  { key: 'QUOTED', label: 'Có báo giá' },
+  { key: 'NEGOTIATING', label: 'Thương lượng' },
+  { key: 'APPROVED', label: 'Đã duyệt' },
 ];
 
 const STATUS_ORDER = CUSTOM_STATUS_STEPS.map(s => s.key);
 
-const STATUS_BADGE_CONFIG = {
-  submitted: 'bg-gray-100 text-gray-600 ring-1 ring-gray-200',
-  designing: 'bg-violet-50 text-violet-700 ring-1 ring-violet-200',
-  ready_for_preview: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200',
-  pending_approval: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
-  printing: 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200',
-  completed: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
-};
-
 const STATUS_LABEL = {
-  submitted: 'Đã gửi yêu cầu',
-  designing: 'Đang thiết kế',
-  ready_for_preview: 'Sẵn sàng xem trước',
-  pending_approval: 'Chờ duyệt',
-  printing: 'Đang in',
-  completed: 'Hoàn thành',
+  SUBMITTED: 'Mới gửi',
+  ASSIGNED: 'NV đã nhận',
+  QUOTED: 'Có báo giá',
+  NEGOTIATING: 'Đang thương lượng',
+  APPROVED: 'Đã duyệt',
+  CANCELLED: 'Đã hủy',
 };
 
-const TechInfoItem = ({ label, value, unit }) => (
-  <div className="flex flex-col gap-0.5">
-    <p className="text-xs text-gray-400 uppercase tracking-wide">{label}</p>
-    <p className="text-sm font-semibold text-gray-800">
-      {value}
-      {unit && <span className="text-xs font-normal text-gray-500 ml-1">{unit}</span>}
-    </p>
-  </div>
-);
+const formatPrice = (price) =>
+  new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price || 0);
+
+const statusColor = (status) => {
+  if (status === 'SUBMITTED') return { background: '#f3f4f6', color: '#6b7280' };
+  if (status === 'ASSIGNED') return { background: '#eff6ff', color: '#2563eb' };
+  if (status === 'QUOTED') return { background: '#f5f3ff', color: '#7c3aed' };
+  if (status === 'NEGOTIATING') return { background: '#fffbeb', color: '#d97706' };
+  if (status === 'APPROVED') return { background: '#ecfdf5', color: '#059669' };
+  return { background: '#fef2f2', color: '#dc2626' };
+};
 
 const CustomOrderDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
-  const { getOrderById } = useOrder();
-  const baseOrder = getOrderById(id);
+  const [order, setOrder] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
 
-  if (!baseOrder) {
+  const [chatMessage, setChatMessage] = useState('');
+  const messagesContainerRef = useRef(null);
+
+  useEffect(() => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [order?.messages]);
+
+  useEffect(() => {
+    fetchDetail();
+
+    const token = localStorage.getItem('token');
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://103.90.227.51:8080/';
+    const hubUrl = `${baseUrl.replace(/\/$/, '')}/hubs/mainflow-2-design`;
+
+    const connection = new HubConnectionBuilder()
+      .withUrl(hubUrl, { accessTokenFactory: () => token })
+      .withAutomaticReconnect()
+      .configureLogging(LogLevel.Information)
+      .build();
+
+    connection.start()
+      .then(() => {
+        connection.invoke('JoinDesignWork', id).catch(console.error);
+        connection.on('Mainflow2Event', () => fetchDetail(true));
+      })
+      .catch(err => console.error('SignalR Error:', err));
+
+    return () => {
+      connection.invoke('LeaveDesignWork', id).catch(console.error);
+      connection.stop();
+    };
+  }, [id]);
+
+  const fetchDetail = async (silent = false) => {
+    try {
+      if (!silent && !order) setLoading(true);
+      const res = await getDesignRequestDetail(id);
+      if (res?.statusCode === 200) setOrder(res.data);
+      else message.error(res?.message || 'Không tìm thấy chi tiết yêu cầu');
+    } catch {
+      message.error('Lỗi khi lấy chi tiết yêu cầu');
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  };
+
+  const handleSendChat = async () => {
+    if (!chatMessage.trim()) return;
+    try {
+      const res = await postDesignRequestMessage(id, { content: chatMessage, attachmentUrls: [] });
+      if (res?.statusCode === 200) { setChatMessage(''); fetchDetail(true); }
+      else message.error(res?.message || 'Lỗi gửi tin');
+    } catch { message.error('Lỗi khi gửi tin nhắn'); }
+  };
+
+  const handleApprove = () => {
+    Modal.confirm({
+      title: 'Chấp nhận báo giá',
+      content: 'Bạn có chắc chắn muốn chấp nhận báo giá này không?',
+      okText: 'Chấp nhận',
+      onOk: async () => {
+        try {
+          setProcessing(true);
+          const res = await approveQuote(id);
+          if (res?.statusCode === 200) { message.success('Đã chấp nhận báo giá!'); fetchDetail(); }
+          else message.error(res?.message || 'Lỗi khi duyệt');
+        } catch { message.error('Lỗi khi duyệt báo giá'); }
+        finally { setProcessing(false); }
+      }
+    });
+  };
+
+  const handleCancel = () => {
+    Modal.confirm({
+      title: 'Hủy yêu cầu',
+      content: 'Bạn có chắc chắn muốn hủy yêu cầu thiết kế này không?',
+      okText: 'Hủy yêu cầu',
+      okType: 'danger',
+      cancelText: 'Bỏ qua',
+      onOk: async () => {
+        try {
+          setProcessing(true);
+          const res = await cancelDesignRequest(id);
+          if (res?.statusCode === 200) { message.success('Đã hủy yêu cầu!'); fetchDetail(); }
+          else message.error(res?.message || 'Lỗi khi hủy');
+        } catch { message.error('Lỗi khi hủy yêu cầu'); }
+        finally { setProcessing(false); }
+      }
+    });
+  };
+
+  if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 px-4">
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">Đơn hàng Custom không tồn tại</h2>
-        <p className="text-gray-500 mb-6">Chúng tôi không tìm thấy thông tin đơn hàng này.</p>
-        <Link to="/my-orders" className="text-indigo-600 font-medium hover:underline">
-          Quay lại danh sách Đơn hàng
-        </Link>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 64px)' }}>
+        <Spin size="large" />
       </div>
     );
   }
 
-  const order = {
-    ...baseOrder,
-    type: 'upload',
-    material: baseOrder.items?.[0]?.material || 'Resin',
-    quantity: baseOrder.items?.[0]?.quantity || 1,
-    serviceType: 'print_paint',
-    description: 'Thiết kế mô hình nhân vật game theo yêu cầu riêng, sơn màu tùy chỉnh, đế trưng bày có khắc tên.',
-    technicalDraft: {
-      material: baseOrder.items?.[0]?.material || 'Resin',
-      infillDensity: 85,
-      layerHeight: 0.05,
-      estimatedWeight: 320,
-      estimatedPrintTime: 18.5,
-      markupPercentage: 15,
-      note: 'Cần hỗ trợ ở phần cánh tay và bệ đặt. Hướng in nghiêng 45° để tối ưu độ bền.',
-    },
-    files: [
-      { name: baseOrder.items?.[0]?.name || 'character_v2.stl', version: 2, isPreview: true, isPrintable: true },
-    ],
-  };
-
-  const currentStepIdx = STATUS_ORDER.indexOf(order.status);
-
-  const handlePreview = (fileName) => {
-    navigate(`/preview/${fileName}`, {
-      state: {
-        breadcrumb: [
-          { title: 'Trang chủ', path: '/' },
-          { title: 'Đơn hàng Custom', path: '/my-custom-orders' },
-          { title: `Chi tiết #${id}`, path: `/custom-orders/${id}` },
-          { title: 'Xem mô hình 3D', path: null },
-        ],
-      },
-    });
-  };
-
-  const handleApprove = () => {
-    alert('Đã duyệt đơn hàng! Chuyển đến trang thanh toán...');
-  };
-
-  const formatPrice = (price) =>
-    new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
+  if (!order) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 64px)' }}>
+        <h2 style={{ fontWeight: 700, color: '#111827' }}>Không tìm thấy yêu cầu</h2>
+        <Link to="/my-custom-orders" style={{ color: '#4f46e5' }}>Quay lại danh sách</Link>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
-      <div className="mb-6">
-        <Breadcrumb
-          items={[
-            { title: <Link to="/">Trang chủ</Link> },
-            { title: <Link to="/my-custom-orders">Đơn Custom</Link> },
-            { title: `Chi tiết #${id}` },
-          ]}
-        />
-      </div>
+    <div style={{ height: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#f8fafc' }}>
 
-      {/* Header */}
-      <div className="flex items-start justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Đơn Custom #{order.id}</h1>
-          <p className="text-gray-500 mt-1">Tạo ngày {order.date}</p>
+      {/* TOPBAR */}
+      <div style={{ flexShrink: 0, background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '0 20px', height: 56, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <Link to="/my-custom-orders"
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, border: '1px solid #e5e7eb', color: '#374151', textDecoration: 'none', fontSize: 16 }}>
+          ←
+        </Link>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ margin: 0, fontWeight: 700, fontSize: 15, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{order.title}</p>
+          <p style={{ margin: 0, fontSize: 11, color: '#9ca3af', fontFamily: 'monospace' }}>#{order.id?.slice(0, 8)}</p>
         </div>
-        <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${STATUS_BADGE_CONFIG[order.status] || 'bg-gray-100 text-gray-600'}`}>
+        <span style={{ padding: '3px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, ...statusColor(order.status) }}>
           {STATUS_LABEL[order.status] || order.status}
         </span>
+        {order.status !== 'CANCELLED' && order.status !== 'APPROVED' && (
+          <button onClick={handleCancel} disabled={processing}
+            style={{ padding: '4px 14px', borderRadius: 8, border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+            Hủy yêu cầu
+          </button>
+        )}
       </div>
 
-      {/* Custom Status Timeline */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
-        <div className="flex items-center gap-2 mb-5">
-          <div className="w-1 h-6 bg-indigo-600 rounded-full"></div>
-          <h2 className="text-lg font-bold text-gray-900">Tiến trình đơn hàng</h2>
-        </div>
-        <div className="flex items-start gap-0 overflow-x-auto pb-2">
-          {CUSTOM_STATUS_STEPS.map((step, idx) => {
-            const isDone = idx <= currentStepIdx;
-            const isCurrent = idx === currentStepIdx;
-            return (
-              <React.Fragment key={step.key}>
-                <div className="flex flex-col items-center min-w-[90px] max-w-[100px]">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
-                    isCurrent ? 'bg-indigo-600 ring-4 ring-indigo-100 text-white' :
-                    isDone ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-400'
-                  }`}>
-                    {isDone ? <CheckCircleSolidIcon /> : (
-                      <span className="text-xs font-semibold">{idx + 1}</span>
-                    )}
+      {/* BODY */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+
+        {/* CHAT COLUMN */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+
+          {/* Messages list */}
+          <div ref={messagesContainerRef}
+            style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+{/* Messages + inline quotes */}
+            {order.messages?.length > 0 ? order.messages.map((msg, i) => {
+              const isMe = msg.authorAccountId === user?.id;
+              const isQuote = msg.logType && msg.logType.toUpperCase().includes('QUOTE');
+
+              if (isQuote) {
+                let meta = null;
+                try { meta = msg.metadataJson ? JSON.parse(msg.metadataJson) : null; } catch {}
+                const hasPrice = meta?.quotedPrice != null;
+                return (
+                  <div key={i} style={{ alignSelf: msg.authorAccountId === user?.id ? 'flex-end' : 'flex-start', width: '100%', marginBottom: 12 }}>
+                    <div style={{ background: '#ecfdf5', border: '1px solid #6ee7b7', borderRadius: '16px 16px 16px 4px', padding: '14px 18px' }}>
+                      <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: 1 }}>
+                        💰 Báo giá từ nhân viên{meta?.revisionNumber ? ` · Rev ${meta.revisionNumber}` : ''}
+                      </p>
+                      {hasPrice && (
+                        <p style={{ margin: '0 0 8px', fontSize: 24, fontWeight: 800, color: '#065f46' }}>
+                          {formatPrice(meta.quotedPrice)}
+                        </p>
+                      )}
+                      {msg.content && <p style={{ margin: '0 0 8px', fontSize: 13, color: '#374151', lineHeight: 1.5 }}>{msg.content}</p>}
+                      {meta?.designFileUrls?.filter(u => u && u.trim() !== "").length > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12, padding: '12px', background: 'rgba(255,255,255,0.9)', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)' }}>
+                          {[...new Set(meta.designFileUrls.filter(u => u && u.trim() !== ""))].slice(1).map((url, fi) => {
+                            const lowUrl = url.toLowerCase();
+                            const isGLB = lowUrl.endsWith('.glb');
+                            const isImage = lowUrl.endsWith('.png') || lowUrl.endsWith('.jpg') || lowUrl.endsWith('.jpeg') || lowUrl.endsWith('.webp');
+
+                            if (isGLB) {
+                              return (
+                                <div key={fi} style={{ position: 'relative' }}>
+                                  <div style={{ width: '100%', height: 260, borderRadius: 8, overflow: 'hidden', background: 'linear-gradient(to bottom, #f8fafc, #f1f5f9)', border: '1px solid #e2e8f0' }}>
+                                    <model-viewer
+                                      src={url}
+                                      camera-controls
+                                      auto-rotate
+                                      shadow-intensity="1"
+                                      environment-image="neutral"
+                                      exposure="1"
+                                      style={{ width: '100%', height: '100%' }}
+                                    />
+                                  </div>
+                                  <a href={url} target="_blank" rel="noreferrer" 
+                                    style={{ position: 'absolute', bottom: 8, right: 8, background: 'rgba(255,255,255,0.9)', padding: '5px 10px', borderRadius: 6, fontSize: 11, color: '#475569', textDecoration: 'none', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
+                                    <span>💾</span> Tải về GLB
+                                  </a>
+                                </div>
+                              );
+                            }
+
+                            if (isImage) {
+                              return (
+                                <a key={fi} href={url} target="_blank" rel="noreferrer" style={{ display: 'block', borderRadius: 8, overflow: 'hidden', border: '1px solid #e2e8f0 shadow-sm' }}>
+                                  <img src={url} alt="" style={{ width: '100%', maxHeight: 300, objectFit: 'contain', display: 'block', background: '#f8fafc' }} />
+                                </a>
+                              );
+                            }
+
+                            return (
+                              <a key={fi} href={url} target="_blank" rel="noreferrer"
+                                style={{ fontSize: 13, color: '#2563eb', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: '#fff', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                                <span style={{ fontSize: 18 }}>📎</span>
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500, maxWidth: 300 }}>{url.split('/').pop()}</span>
+                              </a>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {/* Approve button inline with quote */}
+                      {(order.status === 'QUOTED' || order.status === 'NEGOTIATING') && i === order.messages.length - 1 && (
+                        <div style={{ marginTop: 12 }}>
+                          <Button type="primary" style={{ background: '#059669', borderColor: '#059669', width: '100%' }}
+                            onClick={handleApprove} loading={processing}>
+                            ✓ Chấp nhận báo giá này
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    <span style={{ fontSize: 10, color: '#9ca3af', marginTop: 3, display: 'block' }}>
+                      {new Date(msg.created).toLocaleString('vi-VN')} · Nhân viên
+                    </span>
                   </div>
-                  <p className={`text-xs text-center mt-2 leading-tight font-medium ${
-                    isCurrent ? 'text-indigo-600' : isDone ? 'text-gray-600' : 'text-gray-400'
-                  }`}>
-                    {step.label}
-                  </p>
-                </div>
-                {idx < CUSTOM_STATUS_STEPS.length - 1 && (
-                  <div className={`flex-1 h-0.5 mt-4 min-w-[24px] ${isDone && idx < currentStepIdx ? 'bg-indigo-400' : 'bg-gray-100'}`} />
-                )}
-              </React.Fragment>
-            );
-          })}
-        </div>
-      </div>
+                );
+              }
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Order Details */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-            <div className="flex items-center gap-2 mb-5">
-              <div className="w-1 h-6 bg-indigo-600 rounded-full"></div>
-              <h2 className="text-lg font-bold text-gray-900">Thông tin đơn hàng</h2>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <TechInfoItem label="Loại đơn" value={order.type === 'upload' ? 'Đăng tải File' : order.type} />
-              <TechInfoItem label="Vật liệu" value={order.material} />
-              <TechInfoItem label="Số lượng" value={order.quantity} unit="sản phẩm" />
-              <TechInfoItem label="Dịch vụ" value={order.serviceType === 'print_paint' ? 'In & Sơn' : order.serviceType} />
-            </div>
-            {order.description && (
-              <div className="mt-4 p-3 bg-gray-50 rounded-xl">
-                <p className="text-xs text-gray-500 mb-1 font-medium uppercase tracking-wide">Mô tả yêu cầu</p>
-                <p className="text-sm text-gray-700 leading-relaxed">{order.description}</p>
+              return (
+                <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
+                  <div style={{
+                    padding: '8px 14px',
+                    borderRadius: isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                    maxWidth: '70%', fontSize: 14, lineHeight: 1.5, wordBreak: 'break-word',
+                    background: isMe ? '#4f46e5' : '#fff',
+                    color: isMe ? '#fff' : '#1f2937',
+                    border: isMe ? 'none' : '1px solid #e5e7eb',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                  }}>
+                    {msg.content}
+                  </div>
+                  <span style={{ fontSize: 10, color: '#9ca3af', marginTop: 3 }}>
+                    {new Date(msg.created).toLocaleString('vi-VN')} · {isMe ? 'Tôi' : 'Nhân viên'}
+                  </span>
+                </div>
+              );
+            }) : (
+              <div style={{ textAlign: 'center', color: '#9ca3af', fontSize: 13, marginTop: 40 }}>
+                Chưa có tin nhắn. Nhân viên sẽ liên hệ sớm!
               </div>
             )}
           </div>
 
-          {/* Technical Draft */}
-          {order.technicalDraft && (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-              <div className="flex items-center gap-2 mb-5">
-                <div className="w-1 h-6 bg-violet-500 rounded-full"></div>
-                <h2 className="text-lg font-bold text-gray-900">Thông số kỹ thuật</h2>
-                <div className="ml-auto">
-                  <BeakerIcon />
+          {/* Composer */}
+          <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+            {order.status === 'CANCELLED' ? (
+              <div style={{ flex: 1, textAlign: 'center', color: '#dc2626', fontSize: 13, fontWeight: 500 }}>Yêu cầu đã bị hủy.</div>
+            ) : order.status === 'APPROVED' ? (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '10px 0' }}>
+                <div style={{ color: '#059669', fontSize: 14, fontWeight: 600 }}>
+                  🎉 Chúc mừng! Thiết kế đã được duyệt với giá {formatPrice(order.latestQuotedPrice)}
                 </div>
+                <Button 
+                  type="primary" 
+                  size="large"
+                  style={{ background: '#4f46e5', borderColor: '#4f46e5', height: 48, borderRadius: 12, padding: '0 32px', fontWeight: 700, fontSize: 16 }}
+                  onClick={() => navigate('/checkout', { 
+                    state: { 
+                      product: { 
+                        id: order.id, 
+                        name: `Thiết kế: ${order.title}`, 
+                        latestQuotedPrice: order.latestQuotedPrice,
+                        modelSrc: order.quoteFileVersions?.[0]?.fileUrl || order.quoteFileVersions?.[0]?.url 
+                      }, 
+                      quantity: 1, 
+                      sourceType: 'CUSTOM_QUOTE_MF2' 
+                    } 
+                  })}
+                >
+                  🚀 Thanh toán & Đặt hàng ngay
+                </Button>
+                <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>Bấm tiền hành thanh toán để chúng tôi bắt đầu sản xuất và gửi hàng cho bạn.</p>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
-                <TechInfoItem label="Vật liệu" value={order.technicalDraft.material} />
-                <TechInfoItem label="Độ đặc lớp in" value={order.technicalDraft.infillDensity} unit="%" />
-                <TechInfoItem label="Độ dày lớp" value={order.technicalDraft.layerHeight} unit="mm" />
-                <TechInfoItem label="Trọng lượng ước tính" value={order.technicalDraft.estimatedWeight} unit="g" />
-                <TechInfoItem label="Thời gian in ước tính" value={order.technicalDraft.estimatedPrintTime} unit="giờ" />
-                <TechInfoItem label="Markup" value={`+${order.technicalDraft.markupPercentage}`} unit="%" />
-              </div>
-              {order.technicalDraft.note && (
-                <div className="p-3 bg-violet-50 rounded-xl border border-violet-100">
-                  <p className="text-xs text-violet-600 font-medium mb-1 uppercase tracking-wide">Ghi chú kỹ thuật</p>
-                  <p className="text-sm text-violet-800 leading-relaxed">{order.technicalDraft.note}</p>
-                </div>
+            ) : (
+              <>
+                <Input.TextArea
+                  autoSize={{ minRows: 1, maxRows: 4 }}
+                  value={chatMessage}
+                  onChange={e => setChatMessage(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendChat(); } }}
+                  placeholder="Nhập tin nhắn... (Enter để gửi, Shift+Enter xuống dòng)"
+                  style={{ flex: 1, resize: 'none', borderRadius: 12, fontSize: 14 }}
+                />
+                <Button type="primary"
+                  style={{ background: '#4f46e5', flexShrink: 0, height: 36, borderRadius: 12 }}
+                  disabled={!chatMessage.trim()} onClick={handleSendChat}>
+                  Gửi →
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* RIGHT SIDEBAR */}
+        <div style={{ width: 260, flexShrink: 0, overflowY: 'auto', background: '#fff', borderLeft: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column' }}>
+
+          {/* Timeline */}
+          <div style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
+            <p style={{ margin: '0 0 12px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>Tiến trình</p>
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 0 }}>
+              {CUSTOM_STATUS_STEPS.map((step, idx) => {
+                const currentIdx = STATUS_ORDER.indexOf(order.status);
+                const isDone = idx < currentIdx || (idx === currentIdx && order.status !== 'CANCELLED');
+                const isCurrent = idx === currentIdx && order.status !== 'CANCELLED';
+                return (
+                  <li key={step.key} style={{ display: 'flex', gap: 12, paddingBottom: idx < CUSTOM_STATUS_STEPS.length - 1 ? 16 : 0, position: 'relative' }}>
+                    {idx < CUSTOM_STATUS_STEPS.length - 1 && (
+                      <div style={{ position: 'absolute', left: 11, top: 24, width: 2, bottom: 0, background: isDone ? '#4f46e5' : '#e5e7eb' }} />
+                    )}
+                    <div style={{
+                      width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12,
+                      background: isCurrent ? '#4f46e5' : isDone ? '#4f46e5' : '#f3f4f6',
+                      color: isDone || isCurrent ? '#fff' : '#9ca3af',
+                      border: isCurrent ? '2px solid #a5b4fc' : 'none',
+                      zIndex: 1
+                    }}>
+                      {isDone && !isCurrent ? '✓' : idx + 1}
+                    </div>
+                    <p style={{ margin: 'auto 0', fontSize: 13, fontWeight: isCurrent ? 700 : 500, color: isCurrent ? '#4f46e5' : isDone ? '#111827' : '#9ca3af' }}>
+                      {step.label}
+                    </p>
+                  </li>
+                );
+              })}
+              {order.status === 'CANCELLED' && (
+                <li style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+                  <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#fef2f2', border: '1px solid #fca5a5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#dc2626' }}>✕</div>
+                  <p style={{ margin: 'auto 0', fontSize: 13, fontWeight: 600, color: '#dc2626' }}>Đã hủy</p>
+                </li>
+              )}
+            </ul>
+          </div>
+
+          {/* Quote summary + approve button */}
+          {order.latestQuotedPrice != null && (
+            <div style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
+              <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>Báo giá cuối</p>
+              <p style={{ margin: '0 0 2px', fontSize: 22, fontWeight: 800, color: '#065f46' }}>{formatPrice(order.latestQuotedPrice)}</p>
+              <p style={{ margin: '0 0 12px', fontSize: 11, color: '#9ca3af' }}>Revision {order.quoteRevision}</p>
+              
+              {(order.status === 'QUOTED' || order.status === 'NEGOTIATING') && (
+                <Button type="primary" style={{ background: '#059669', borderColor: '#059669', width: '100%' }}
+                  onClick={handleApprove} loading={processing}>
+                  ✓ Chấp nhận báo giá
+                </Button>
+              )}
+
+              {order.status === 'APPROVED' && (
+                <Button 
+                  type="primary"
+                  style={{ background: '#4f46e5', borderColor: '#4f46e5', width: '100%', fontWeight: 700 }}
+                  onClick={() => navigate('/checkout', { 
+                    state: { 
+                      product: { 
+                        id: order.id, 
+                        name: `Thiết kế: ${order.title}`, 
+                        latestQuotedPrice: order.latestQuotedPrice,
+                        modelSrc: order.quoteFileVersions?.[0]?.fileUrl || order.quoteFileVersions?.[0]?.url 
+                      }, 
+                      quantity: 1, 
+                      sourceType: 'CUSTOM_QUOTE_MF2' 
+                    } 
+                  })}
+                >
+                  🚀 Thanh toán ngay
+                </Button>
               )}
             </div>
           )}
 
-          {/* Design Files */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-            <div className="flex items-center gap-2 mb-5">
-              <div className="w-1 h-6 bg-indigo-600 rounded-full"></div>
-              <h2 className="text-lg font-bold text-gray-900">File thiết kế</h2>
-            </div>
-            <div className="space-y-3">
-              {order.files.map((file, idx) => (
-                <div
-                  key={idx}
-                  className={`flex items-center justify-between p-4 rounded-xl border transition-colors duration-150 ${
-                    file.isPreview ? 'border-indigo-200 bg-indigo-50/50' : 'border-gray-100 bg-gray-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${file.isPreview ? 'bg-indigo-100' : 'bg-gray-100'}`}>
-                      <DocumentIcon />
+          {/* File versions */}
+          {order.quoteFileVersions?.length > 0 && (
+            <div style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
+              <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>File 3D đính kèm</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {order.quoteFileVersions.map((f, i) => (
+                  <a key={i} href={f.fileUrl || f.url} target="_blank" rel="noreferrer"
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#f0f4ff', borderRadius: 8, textDecoration: 'none', border: '1px solid #e0e7ff' }}>
+                    <span style={{ fontSize: 18 }}>📦</span>
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#3730a3', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.title || `File v${f.versionNumber}`}</p>
+                      <p style={{ margin: 0, fontSize: 10, color: '#6b7280' }}>Phiên bản {f.versionNumber}</p>
                     </div>
-                    <div>
-                      <p className="font-medium text-sm text-gray-900">{file.name}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <p className="text-xs text-gray-500">Phiên bản {file.version}</p>
-                        {file.isPreview && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700 ring-1 ring-indigo-200">
-                            Xem trước được
-                          </span>
-                        )}
-                        {file.isPrintable && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">
-                            Sẵn sàng in
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    {file.isPreview && (
-                      <button
-                        onClick={() => handlePreview(file.name)}
-                        className="inline-flex items-center gap-1.5 py-2 px-3 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 transition-colors duration-150 cursor-pointer"
-                      >
-                        <EyeIcon />
-                        Xem 3D
-                      </button>
-                    )}
-                    <button className="inline-flex items-center gap-1.5 py-2 px-3 bg-white text-gray-600 border border-gray-200 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors duration-150 cursor-pointer">
-                      <ArrowDownTrayIcon />
-                      Tải xuống
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Right: Sidebar */}
-        <div className="lg:col-span-1">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 sticky top-24 space-y-5">
-            {/* Price Summary */}
-            <div>
-              <h3 className="font-bold text-gray-900 mb-3">Chi tiết giá</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Tạm tính</span>
-                  <span className="text-gray-700">{formatPrice(order.subtotal)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Phí vận chuyển</span>
-                  <span className="text-gray-700">{formatPrice(order.shipping)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Thuế VAT (8%)</span>
-                  <span className="text-gray-700">{formatPrice(order.tax)}</span>
-                </div>
-                <div className="pt-2 border-t border-gray-100 flex justify-between">
-                  <span className="font-bold text-gray-900">Tổng cộng</span>
-                  <span className="font-bold text-indigo-600 text-lg">{formatPrice(order.total)}</span>
-                </div>
+                  </a>
+                ))}
               </div>
             </div>
+          )}
 
-            {/* ETA */}
-            {order.technicalDraft && (
-              <div className="pt-4 border-t border-gray-100">
-                <p className="text-xs text-gray-500 mb-1">Thời gian in ước tính</p>
-                <p className="font-semibold text-gray-900 text-sm">{order.technicalDraft.estimatedPrintTime} giờ / sản phẩm</p>
-                <p className="text-xs text-gray-500 mt-0.5">Tổng: ~{(order.technicalDraft.estimatedPrintTime * order.quantity).toFixed(1)} giờ cho {order.quantity} sản phẩm</p>
-              </div>
-            )}
-
-            {/* Approve & Pay */}
-            {order.status === 'pending_approval' && (
-              <div className="pt-4 border-t border-gray-100 space-y-3">
-                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800">
-                  <p className="font-semibold mb-1">Chờ xác nhận của bạn</p>
-                  <p>Vui lòng xem lại file thiết kế và thông số kỹ thuật trước khi duyệt.</p>
-                </div>
-                <button
-                  onClick={handleApprove}
-                  className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-indigo-500 text-white rounded-xl font-semibold text-sm hover:from-indigo-700 hover:to-indigo-600 active:from-indigo-800 transition-all duration-200 cursor-pointer shadow-sm shadow-indigo-200"
-                >
-                  Duyệt & Thanh toán {formatPrice(order.total)}
-                </button>
-              </div>
-            )}
-
-            {/* Review if completed */}
-            {order.status === 'completed' && (
-              <Link
-                to={`/feedback/${order.id}`}
-                className="block w-full py-3 text-center bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors duration-200 cursor-pointer"
-              >
-                Gửi đánh giá
-              </Link>
-            )}
+          {/* Order info */}
+          <div style={{ padding: '16px' }}>
+            <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>Mã yêu cầu</p>
+            <p style={{ margin: 0, fontSize: 11, fontFamily: 'monospace', color: '#374151', wordBreak: 'break-all' }}>{order.id}</p>
           </div>
         </div>
       </div>

@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { message } from 'antd';
+import { createDesignRequest } from '../api/mainflow2Api';
 import img1 from '../components/imgs/1.png';
 import img2 from '../components/imgs/2.png';
 
 const CustomOrderRequestDesign = () => {
   const navigate = useNavigate();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
+    title: '',
     images: [],
     description: ''
   });
@@ -24,11 +28,39 @@ const CustomOrderRequestDesign = () => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // TODO: Submit design request
-    alert('Yêu cầu thiết kế đã được gửi!');
-    navigate('/my-custom-orders');
+    if (!formData.title || !formData.description) {
+      message.warning('Vui lòng nhập đầy đủ tiêu đề và mô tả!');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      // Giả lập upload ảnh lấy URL thật, ở đây truyền url tượng trưng
+      const mockImageUrls = formData.images.length > 0 
+        ? formData.images.map(img => `https://mock.com/${img.name}`)
+        : [];
+
+      const payload = {
+        title: formData.title,
+        requirementBrief: formData.description,
+        initialIdeaImageUrls: mockImageUrls
+      };
+
+      const res = await createDesignRequest(payload);
+      if (res && res.statusCode === 200) {
+        message.success('Yêu cầu thiết kế đã được gửi!');
+        navigate('/my-custom-orders');
+      } else {
+        message.error(res?.message || 'Có lỗi xảy ra khi tạo yêu cầu!');
+      }
+    } catch (error) {
+      console.error(error);
+      message.error('Có lỗi xảy ra, vui lòng thử lại sau.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -36,6 +68,19 @@ const CustomOrderRequestDesign = () => {
       <h1 className="text-3xl font-bold mb-8 text-gray-800">Yêu cầu Dịch vụ Thiết kế</h1>
 
       <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-md p-8">
+        <div className="mb-6">
+          <label className="block mb-2 font-medium text-gray-800">Tiêu đề yêu cầu</label>
+          <input
+            type="text"
+            name="title"
+            value={formData.title}
+            onChange={handleChange}
+            required
+            className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:border-indigo-600"
+            placeholder="Ví dụ: Thiết kế nhân vật anh hùng mini..."
+          />
+        </div>
+
         <div className="mb-6">
           <label className="block mb-2 font-medium text-gray-800">Hình ảnh tham khảo</label>
           <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-indigo-600 transition-colors">
@@ -96,9 +141,12 @@ const CustomOrderRequestDesign = () => {
         <div className="flex gap-4">
           <button
             type="submit"
-            className="flex-1 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
+            disabled={isSubmitting}
+            className={`flex-1 py-3 text-white rounded-lg font-semibold transition-colors ${
+              isSubmitting ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'
+            }`}
           >
-            Gửi yêu cầu
+            {isSubmitting ? 'Đang gửi...' : 'Gửi yêu cầu'}
           </button>
           <button
             type="button"

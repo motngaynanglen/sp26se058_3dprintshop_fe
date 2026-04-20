@@ -4,6 +4,9 @@ import { CONCEP_TAG_ENDPOINTS } from './endpoints';
 const conceptTagApi = {
   getAll: async () => {
     try {
+      // promise:
+      // 1. diễn ra và có kết quả trong tương lai
+      // 2. Có nhiều trạng thái: pending, fulfilled, rejected
       const response = await axiosInstance.get(CONCEP_TAG_ENDPOINTS.GET_ALL);
       return response.data;
     } catch (error) {

@@ -38,9 +38,9 @@ export const DESIGN_TAG_ENDPOINTS = {
 };
 
 export const DESIGN_VARIANT_ENDPOINTS = {
-  SEARCH: "/api/design-variant",
+  SEARCH: "/api/design-variant/",
   ADD: "/api/design-variant/add",
-  UPDATE: "/api/design-variant/update", 
+  UPDATE: "/api/design-variant/update",
   UPDATE_QUANTITY: "/api/design-variant/quantity",
   DELETE: "/api/design-variant", // appending /{id}/delete
 };

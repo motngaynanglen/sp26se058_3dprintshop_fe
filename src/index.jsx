@@ -9,14 +9,12 @@ import { antdTheme } from './theme/antdTheme';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
-  <React.StrictMode>
-    <ConfigProvider theme={antdTheme}>
-      {/* Bọc AntApp ngay bên trong ConfigProvider để message nhận được Theme */}
-      <AntApp>
-        <App />
-      </AntApp>
-    </ConfigProvider>
-  </React.StrictMode>
+  <ConfigProvider theme={antdTheme}>
+    {/* Bọc AntApp ngay bên trong ConfigProvider để message nhận được Theme */}
+    <AntApp>
+      <App />
+    </AntApp>
+  </ConfigProvider>
 );
 
 // If you want to start measuring performance in your app, pass a function

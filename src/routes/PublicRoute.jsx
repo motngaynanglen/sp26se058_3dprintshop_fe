@@ -17,7 +17,7 @@ const PublicRoute = ({ children }) => {
 
   if (isAuthenticated) {
     const role = user?.role?.toLowerCase();
-    if (role === 'admin') return <Navigate to="/admin/dashboard" replace />;
+    if (role === 'admin') return <Navigate to="/admin" replace />;
     // Staff có thể xem trang chủ, không ép về dashboard
     // if (role === 'employee') return <Navigate to="/staff/dashboard" replace />;
   }
