@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useCart } from '../contexts/CartContext';
 import { getProductById } from '../data/products';
 import {
   Button,
@@ -21,7 +20,7 @@ import {
 } from 'antd';
 import {
   ArrowLeftOutlined,
-  ShoppingCartOutlined,
+  ShoppingOutlined,
   EyeOutlined,
   InfoCircleOutlined,
   CheckCircleOutlined
@@ -35,7 +34,7 @@ const ProductDetail = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated, isCustomer, isManager, isAdmin, isEmployee } = useAuth();
-  const { addToCart } = useCart();
+
   
   const [product, setProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
@@ -67,21 +66,22 @@ const ProductDetail = () => {
     }
   };
 
-  const handleAddToCart = () => {
+  const handleBuyNow = () => {
     if (!isAuthenticated) {
       navigate('/login');
       return;
     }
-    addToCart(product, quantity, selectedMaterial);
-    notification.success({
-      message: 'Đã thêm vào giỏ hàng',
-      description: `Thêm ${quantity} sản phẩm "${product.name}" với vật liệu ${selectedMaterial} thành công.`,
-      placement: 'bottomRight'
+    navigate('/checkout', {
+      state: {
+        product,
+        quantity,
+        material: selectedMaterial,
+      }
     });
   };
 
-  // Determine if should show Add to Cart
-  const showAddToCart = isCustomer;
+  // Determine if should show Buy Now
+  const showBuyNow = isCustomer;
 
   if (!product) {
     return <div className="min-h-screen flex items-center justify-center font-medium text-slate-500">Đang tải dữ liệu sản phẩm...</div>;
@@ -211,17 +211,17 @@ const ProductDetail = () => {
 
                 {/* Action Buttons */}
                 <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-                  {/* Add to Cart - Only for Customers */}
-                  {showAddToCart && (
+                  {/* Buy Now - Only for Customers */}
+                  {showBuyNow && (
                     <Button
                       type="primary"
                       size="large"
-                      icon={<ShoppingCartOutlined />}
-                      onClick={handleAddToCart}
+                      icon={<ShoppingOutlined />}
+                      onClick={handleBuyNow}
                       block
                       style={{ height: 50 }}
                     >
-                      Thêm vào giỏ hàng
+                      Mua hàng
                     </Button>
                   )}
 
@@ -246,7 +246,7 @@ const ProductDetail = () => {
                   </Button>
 
                   {/* Info for non-customers */}
-                  {!showAddToCart && (
+                  {!showBuyNow && (
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                       <div className="flex items-start gap-3">
                         <InfoCircleOutlined className="text-blue-600 text-xl mt-1" />

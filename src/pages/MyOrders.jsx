@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { useOrder } from '../contexts/OrderContext';
-
+import { Spin } from 'antd';
+import { queryOrdersApi } from '../api/orderApi';
 
 // SVG Icons
 const PackageIcon = ({ className = "w-4 h-4" }) => (
@@ -28,50 +28,42 @@ const ArrowRightIcon = () => (
   </svg>
 );
 
-// ─── ORDER STATUS CONFIG (theo backend: Created→Confirmed→Processing→Shipping→Completed|Failed)
+const ChevronLeftIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+  </svg>
+);
+
+const ChevronRightIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+    <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+  </svg>
+);
+
+// ─── ORDER STATUS CONFIG
 const ORDER_STATUS_CONFIG = {
-  created: {
-    label: 'Chờ thanh toán',
-    className: 'bg-gray-100 text-gray-600 ring-1 ring-gray-200',
-  },
-  confirmed: {
-    label: 'Đã xác nhận',
-    className: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200',
-  },
-  processing: {
-    label: 'Đang xử lý',
-    className: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
-  },
-  shipping: {
-    label: 'Đang vận chuyển',
-    className: 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200',
-  },
-  completed: {
-    label: 'Hoàn thành',
-    className: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
-  },
-  failed: {
-    label: 'Thất bại',
-    className: 'bg-red-50 text-red-700 ring-1 ring-red-200',
-  },
+  CREATED: { label: 'Chờ thanh toán', className: 'bg-gray-100 text-gray-600 ring-1 ring-gray-200' },
+  PENDING: { label: 'Chờ thanh toán', className: 'bg-gray-100 text-gray-600 ring-1 ring-gray-200' },
+  PAID: { label: 'Đã thanh toán', className: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200' },
+  CONFIRMED: { label: 'Đã xác nhận', className: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200' },
+  PROCESSING: { label: 'Đang xử lý', className: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200' },
+  SHIPPING: { label: 'Đang vận chuyển', className: 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200' },
+  COMPLETED: { label: 'Hoàn thành', className: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' },
+  CANCELLED: { label: 'Đã hủy', className: 'bg-red-50 text-red-700 ring-1 ring-red-200' },
+  FAILED: { label: 'Thất bại', className: 'bg-red-50 text-red-700 ring-1 ring-red-200' },
 };
 
-// ─── TYPE CONFIG
-const TYPE_CONFIG = {
-  product: {
-    label: 'Sản phẩm',
-    badgeClass: 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200',
-    icon: <PackageIcon className="w-3 h-3" />,
-  },
-  custom: {
-    label: 'Custom Design',
-    badgeClass: 'bg-violet-50 text-violet-700 ring-1 ring-violet-200',
-    icon: <SparklesIcon className="w-3 h-3" />,
-  },
+// ─── SOURCE TYPE CONFIG
+const SOURCE_TYPE_CONFIG = {
+  IN_STOCK: { label: 'Sẵn hàng', badgeClass: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200', icon: <PackageIcon className="w-3 h-3" /> },
+  PRE_ORDER: { label: 'Pre-Order', badgeClass: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200', icon: <PackageIcon className="w-3 h-3" /> },
+  DESIGN_SERVICE: { label: 'Thiết kế', badgeClass: 'bg-violet-50 text-violet-700 ring-1 ring-violet-200', icon: <SparklesIcon className="w-3 h-3" /> },
+  PRINT_SERVICE: { label: 'In 3D', badgeClass: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200', icon: <PackageIcon className="w-3 h-3" /> },
 };
 
 const StatusBadge = ({ status }) => {
-  const config = ORDER_STATUS_CONFIG[status] || { label: status, className: 'bg-gray-100 text-gray-600' };
+  const s = (status || '').toUpperCase();
+  const config = ORDER_STATUS_CONFIG[s] || { label: status || '—', className: 'bg-gray-100 text-gray-600' };
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.className}`}>
       {config.label}
@@ -79,8 +71,9 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-const TypeBadge = ({ type }) => {
-  const config = TYPE_CONFIG[type] || TYPE_CONFIG.product;
+const SourceTypeBadge = ({ sourceType }) => {
+  const s = (sourceType || '').toUpperCase();
+  const config = SOURCE_TYPE_CONFIG[s] || SOURCE_TYPE_CONFIG.IN_STOCK;
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${config.badgeClass}`}>
       {config.icon}
@@ -89,27 +82,99 @@ const TypeBadge = ({ type }) => {
   );
 };
 
-// ─── FILTERS dựa theo OrderStatus chính thức của backend
-const FILTERS = [
-  { value: 'all', label: 'Tất cả', filterFn: () => true },
-  { value: 'product', label: 'Sản phẩm', filterFn: (o) => o.type === 'product' },
-  { value: 'custom', label: 'Custom', filterFn: (o) => o.type === 'custom' },
-  { value: 'active', label: 'Đang xử lý', filterFn: (o) => ['confirmed', 'processing', 'shipping'].includes(o.status) },
-  { value: 'completed', label: 'Hoàn thành', filterFn: (o) => o.status === 'completed' },
-  { value: 'failed', label: 'Thất bại', filterFn: (o) => o.status === 'failed' },
+// ─── FILTER TABS — filter bằng API query status
+const FILTER_TABS = [
+  { value: 'all', label: 'Tất cả', status: null },
+  { value: 'created', label: 'Chờ thanh toán', status: 'CREATED' },
+  { value: 'confirmed', label: 'Đã xác nhận', status: 'CONFIRMED' },
+  { value: 'processing', label: 'Đang xử lý', status: 'PROCESSING' },
+  { value: 'shipping', label: 'Đang vận chuyển', status: 'SHIPPING' },
+  { value: 'completed', label: 'Hoàn thành', status: 'COMPLETED' },
+  { value: 'cancelled', label: 'Đã hủy', status: 'CANCELLED' },
 ];
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return '—';
+  try {
+    return new Intl.DateTimeFormat('vi-VN', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+    }).format(new Date(dateStr));
+  } catch {
+    return dateStr;
+  }
+};
+
+const formatPrice = (price) => {
+  if (price == null) return '—';
+  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
+};
 
 const MyOrders = () => {
   const [filter, setFilter] = useState('all');
-  const { orders } = useOrder();
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [pagination, setPagination] = useState({ pageNumber: 1, pageSize: 10, totalCount: 0, totalPages: 0 });
 
-  const activeFilter = FILTERS.find(f => f.value === filter);
-  const filteredOrders = orders.filter(activeFilter.filterFn);
+  const fetchOrders = useCallback(async (statusFilter, page = 1) => {
+    try {
+      setLoading(true);
+      setError(null);
 
-  const countForFilter = (f) => orders.filter(f.filterFn).length;
+      const payload = {
+        search: null,
+        status: statusFilter || null,
+        priority: null,
+        sortDescending: true,
+        sortBy: 'created',
+        paging: {
+          pageNumber: page,
+          pageSize: 10,
+        },
+      };
 
-  const formatPrice = (price) =>
-    new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
+      const response = await queryOrdersApi(payload);
+      console.log('Orders query response:', response);
+
+      const data = response?.data || response;
+
+      // Response có thể là { items: [...], totalCount, pageNumber, ... } hoặc array trực tiếp
+      if (Array.isArray(data)) {
+        setOrders(data);
+        setPagination({ pageNumber: 1, pageSize: 10, totalCount: data.length, totalPages: 1 });
+      } else {
+        const items = data?.items || data?.data || [];
+        setOrders(Array.isArray(items) ? items : []);
+        setPagination({
+          pageNumber: data?.pageNumber || data?.paging?.pageNumber || page,
+          pageSize: data?.pageSize || data?.paging?.pageSize || 10,
+          totalCount: data?.totalCount || data?.total || items.length,
+          totalPages: data?.totalPages || Math.ceil((data?.totalCount || items.length) / 10),
+        });
+      }
+    } catch (err) {
+      console.error('Failed to fetch orders:', err);
+      setError(err?.response?.data?.message || err?.response?.data?.title || 'Không thể tải danh sách đơn hàng.');
+      setOrders([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Fetch khi filter thay đổi
+  useEffect(() => {
+    const activeTab = FILTER_TABS.find(t => t.value === filter);
+    fetchOrders(activeTab?.status, 1);
+  }, [filter, fetchOrders]);
+
+  const handleFilterChange = (value) => {
+    setFilter(value);
+  };
+
+  const handlePageChange = (page) => {
+    const activeTab = FILTER_TABS.find(t => t.value === filter);
+    fetchOrders(activeTab?.status, page);
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">
@@ -120,10 +185,10 @@ const MyOrders = () => {
 
       {/* Filter Tabs */}
       <div className="mb-6 flex gap-2 flex-wrap">
-        {FILTERS.map(f => (
+        {FILTER_TABS.map(f => (
           <button
             key={f.value}
-            onClick={() => setFilter(f.value)}
+            onClick={() => handleFilterChange(f.value)}
             className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-150 cursor-pointer ${
               filter === f.value
                 ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200'
@@ -131,18 +196,31 @@ const MyOrders = () => {
             }`}
           >
             {f.label}
-            <span className={`inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full text-xs font-semibold ${
-              filter === f.value ? 'bg-indigo-500 text-white' : 'bg-gray-100 text-gray-500'
-            }`}>
-              {countForFilter(f)}
-            </span>
           </button>
         ))}
       </div>
 
-      {/* Table */}
+      {/* Content */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        {filteredOrders.length === 0 ? (
+        {loading ? (
+          <div className="py-20 text-center flex flex-col items-center gap-3">
+            <Spin size="large" />
+            <p className="text-gray-500 text-sm mt-2">Đang tải đơn hàng...</p>
+          </div>
+        ) : error ? (
+          <div className="py-20 text-center flex flex-col items-center gap-3">
+            <p className="text-red-500 font-medium">{error}</p>
+            <button
+              onClick={() => {
+                const activeTab = FILTER_TABS.find(t => t.value === filter);
+                fetchOrders(activeTab?.status, 1);
+              }}
+              className="mt-2 text-sm text-indigo-600 hover:text-indigo-700 font-medium cursor-pointer"
+            >
+              Thử lại
+            </button>
+          </div>
+        ) : orders.length === 0 ? (
           <div className="py-20 text-center flex flex-col items-center gap-3">
             <div className="text-gray-300">
               <ClipboardListIcon />
@@ -157,38 +235,94 @@ const MyOrders = () => {
             </Link>
           </div>
         ) : (
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Mã đơn hàng</th>
-                <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Ngày đặt</th>
-                <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Loại</th>
-                <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Trạng thái</th>
-                <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Tổng tiền</th>
-                <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {filteredOrders.map(order => (
-                <tr key={order.id} className="hover:bg-gray-50/70 transition-colors duration-100">
-                  <td className="px-6 py-4 text-sm font-mono font-semibold text-gray-800">{order.id}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{order.date}</td>
-                  <td className="px-6 py-4"><TypeBadge type={order.type} /></td>
-                  <td className="px-6 py-4"><StatusBadge status={order.status} /></td>
-                  <td className="px-6 py-4 text-sm font-bold text-gray-900">{formatPrice(order.total)}</td>
-                  <td className="px-6 py-4">
-                    <Link
-                      to={order.type === 'custom' ? `/custom-orders/${order.id}` : `/orders/${order.id}`}
-                      className="inline-flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-800 font-medium transition-colors duration-150 cursor-pointer"
-                    >
-                      Xem chi tiết
-                      <ArrowRightIcon />
-                    </Link>
-                  </td>
+          <>
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-100">
+                <tr>
+                  <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Mã đơn hàng</th>
+                  <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Ngày đặt</th>
+                  <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Loại</th>
+                  <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Trạng thái</th>
+                  <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Tổng tiền</th>
+                  <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Thao tác</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {orders.map(order => {
+                  const orderId = order.id || order.orderId;
+                  const orderCode = order.code || order.orderCode || orderId;
+                  const orderDate = order.createdAt || order.created || order.date;
+                  const orderStatus = order.status || order.orderStatus || 'CREATED';
+                  const orderTotal = order.totalAmount || order.total || 0;
+                  const orderSourceType = order.sourceType || 'IN_STOCK';
+
+                  return (
+                    <tr key={orderId} className="hover:bg-gray-50/70 transition-colors duration-100">
+                      <td className="px-6 py-4">
+                        <span className="text-sm font-mono font-semibold text-gray-800">{orderCode}</span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600">{formatDate(orderDate)}</td>
+                      <td className="px-6 py-4"><SourceTypeBadge sourceType={orderSourceType} /></td>
+                      <td className="px-6 py-4"><StatusBadge status={orderStatus} /></td>
+                      <td className="px-6 py-4 text-sm font-bold text-gray-900">{formatPrice(orderTotal)}</td>
+                      <td className="px-6 py-4">
+                        <Link
+                          to={`/orders/${orderId}`}
+                          className="inline-flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-800 font-medium transition-colors duration-150 cursor-pointer"
+                        >
+                          Xem chi tiết
+                          <ArrowRightIcon />
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            {/* Pagination */}
+            {pagination.totalPages > 1 && (
+              <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100">
+                <p className="text-sm text-gray-500">
+                  Trang {pagination.pageNumber} / {pagination.totalPages} · Tổng {pagination.totalCount} đơn hàng
+                </p>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => handlePageChange(pagination.pageNumber - 1)}
+                    disabled={pagination.pageNumber <= 1}
+                    className="p-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                  >
+                    <ChevronLeftIcon />
+                  </button>
+                  {Array.from({ length: Math.min(pagination.totalPages, 5) }, (_, i) => {
+                    const start = Math.max(1, Math.min(pagination.pageNumber - 2, pagination.totalPages - 4));
+                    const page = start + i;
+                    if (page > pagination.totalPages) return null;
+                    return (
+                      <button
+                        key={page}
+                        onClick={() => handlePageChange(page)}
+                        className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                          page === pagination.pageNumber
+                            ? 'bg-indigo-600 text-white'
+                            : 'text-gray-600 hover:bg-gray-100'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    );
+                  })}
+                  <button
+                    onClick={() => handlePageChange(pagination.pageNumber + 1)}
+                    disabled={pagination.pageNumber >= pagination.totalPages}
+                    className="p-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                  >
+                    <ChevronRightIcon />
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

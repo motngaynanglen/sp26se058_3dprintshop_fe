@@ -1,495 +1,490 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
+import { Spin, message, Modal, Input, Button, InputNumber } from "antd";
+import { HubConnectionBuilder, LogLevel } from "@microsoft/signalr";
+import { getDesignRequestDetail, assignStaffToRequest, submitQuote, postDesignRequestMessage, cancelDesignRequest, uploadFile } from "../../api/mainflow2Api";
+import { useAuth } from "../../contexts/AuthContext";
 
-// Mock data based on DB schema:
-// Order → OrderItem → Design_Work → Design_Version_History
-// OrderItem.SourceType: PREMADE, CUSTOMER_FILE, DESIGN_WORK, AI_GENERATE
-// OrderItem.FulfillmentStatus: PENDING, DESIGNING, WAITING_REVIEW, APPROVED, PRINTING, COMPLETED, REJECTED
+const CUSTOM_STATUS_STEPS = [
+  { key: 'SUBMITTED', label: 'Gửi yêu cầu' },
+  { key: 'ASSIGNED', label: 'Đã phân công' },
+  { key: 'QUOTED', label: 'Đã báo giá' },
+  { key: 'NEGOTIATING', label: 'Thương lượng' },
+  { key: 'APPROVED', label: 'Đã duyệt' },
+];
 
-const mockOrder = {
-  // From Order table
-  id: "ORD-001",
-  customerId: "CUST-001",
-  staffId: "STAFF-001",
-  totalPrice: 450000,
-  orderStatus: "PROCESSING",
-  priority: 1,
-  createdAt: "2024-01-15 14:30",
+const STATUS_ORDER = CUSTOM_STATUS_STEPS.map(s => s.key);
 
-  // From Customer + Account tables (joined)
-  customer: {
-    id: "CUST-001",
-    accountId: "ACC-001",
-    fullname: "Nguyễn Văn An",
-    email: "an@email.com",
-    contactPhone: "0901234567",
-    dateOfBirth: "1995-05-15",
-  },
-
-  // From ShippingAddress table
-  shippingAddress: {
-    id: "ADDR-001",
-    receiverName: "Nguyễn Văn An",
-    phone: "0901234567",
-    addressLine: "123 Nguyễn Huệ",
-    ward: "Phường Bến Nghé",
-    district: "Quận 1",
-    city: "TP.HCM",
-    province: "Hồ Chí Minh",
-    isDefault: true,
-  },
-
-  // From OrderItem table
-  items: [
-    {
-      id: "ITEM-001",
-      orderId: "ORD-001",
-      sourceType: "PREMADE",  // From Design_Variant
-      designVariantId: "VAR-001",
-      designVersionHistoryId: null,
-      quantityOrdered: 2,
-      unitPrice: 50000,
-      totalPrice: 100000,
-      fulfillmentStatus: "PENDING",
-      createdAt: "2024-01-15 14:30",
-      // Joined from Design_Variant
-      designVariant: {
-        id: "VAR-001",
-        code: "KEY-001",
-        name: "Móc khóa nhựa PLA",
-        price: 50000,
-        previewModelUrl: "/models/keychain.glb",
-      },
-    },
-    {
-      id: "ITEM-002",
-      orderId: "ORD-001",
-      sourceType: "DESIGN_WORK",  // Custom design request
-      designVariantId: null,
-      designVersionHistoryId: "DVH-002",
-      quantityOrdered: 1,
-      unitPrice: 250000,
-      totalPrice: 250000,
-      fulfillmentStatus: "DESIGNING",
-      createdAt: "2024-01-15 14:30",
-      // Joined from Design_Work
-      designWork: {
-        id: "DW-001",
-        sourceType: "CUSTOMER_REQUEST",
-        assignedStaffId: "STAFF-001",
-        status: "IN_PROGRESS",
-        createdAt: "2024-01-15 14:30",
-      },
-      // Design_Version_History
-      designVersions: [
-        {
-          id: "DVH-001",
-          versionNumber: 1,
-          fileUrl: "/designs/design_v1.stl",
-          uploaderId: "STAFF-001",
-          isPreviewable: true,
-          isPrintable: false,
-          createdAt: "2024-01-16 10:00",
-          status: "REJECTED",
-          note: "Bản đầu tiên - chưa đạt yêu cầu"
-        },
-      ],
-      // From Design_Thread → Design_Message
-      customerRequest: "Yêu cầu tượng chibi nhân vật anime, cao 10cm, tư thế đứng",
-    },
-    {
-      id: "ITEM-003",
-      orderId: "ORD-001",
-      sourceType: "CUSTOMER_FILE",  // Customer uploaded file
-      designVariantId: null,
-      designVersionHistoryId: "DVH-003",
-      quantityOrdered: 1,
-      unitPrice: 100000,
-      totalPrice: 100000,
-      fulfillmentStatus: "WAITING_REVIEW",
-      createdAt: "2024-01-15 14:30",
-      // Customer uploaded file info
-      customerFile: {
-        fileName: "phone_case_design.stl",
-        fileUrl: "/uploads/phone_case_design.stl",
-        fileSize: "2.4 MB",
-        uploadedAt: "2024-01-15 14:35",
-      },
-    },
-  ],
-
-  // From Invoice table
-  invoice: {
-    id: "INV-001",
-    invoiceCode: "INV-2024-0001",
-    subTotal: 450000,
-    taxAmount: 0,
-    shippingFee: 30000,
-    totalAmount: 480000,
-    paymentStatus: "UNPAID",
-    dueDate: "2024-01-22",
-  },
+const STATUS_LABEL = {
+  SUBMITTED: 'Mới gửi',
+  ASSIGNED: 'Đã nhận việc',
+  QUOTED: 'Đã báo giá',
+  NEGOTIATING: 'Đang thương lượng',
+  APPROVED: 'Đã duyệt',
+  CANCELLED: 'Đã hủy',
 };
 
-// FulfillmentStatus from OrderItem
-const fulfillmentStatusConfig = {
-  PENDING: { label: "Chờ xử lý", color: "bg-yellow-100 text-yellow-800", icon: "⏳" },
-  DESIGNING: { label: "Đang thiết kế", color: "bg-blue-100 text-blue-800", icon: "🎨" },
-  WAITING_REVIEW: { label: "Chờ duyệt", color: "bg-purple-100 text-purple-800", icon: "👁️" },
-  APPROVED: { label: "Đã duyệt", color: "bg-green-100 text-green-800", icon: "✅" },
-  READY_TO_PRINT: { label: "Sẵn sàng in", color: "bg-indigo-100 text-indigo-800", icon: "📋" },
-  PRINTING: { label: "Đang in", color: "bg-orange-100 text-orange-800", icon: "🖨️" },
-  COMPLETED: { label: "Hoàn thành", color: "bg-green-100 text-green-800", icon: "✓" },
-  REJECTED: { label: "Từ chối", color: "bg-red-100 text-red-800", icon: "✗" },
-};
+const formatPrice = (price) =>
+  new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price || 0);
 
-// SourceType from OrderItem
-const sourceTypeConfig = {
-  PREMADE: { label: "Design_Variant có sẵn", color: "text-gray-600", icon: "📦" },
-  CUSTOMER_FILE: { label: "File khách upload", color: "text-blue-600", icon: "📤" },
-  DESIGN_WORK: { label: "Design_Work tạo mới", color: "text-purple-600", icon: "✏️" },
-  AI_GENERATE: { label: "AI Generate", color: "text-green-600", icon: "🤖" },
-};
-
-// OrderStatus from Order
-const orderStatusConfig = {
-  PENDING: { label: "Chờ xử lý", color: "bg-yellow-100 text-yellow-800" },
-  PROCESSING: { label: "Đang xử lý", color: "bg-blue-100 text-blue-800" },
-  PRINTING: { label: "Đang in", color: "bg-orange-100 text-orange-800" },
-  SHIPPED: { label: "Đã giao", color: "bg-indigo-100 text-indigo-800" },
-  COMPLETED: { label: "Hoàn thành", color: "bg-green-100 text-green-800" },
+const statusColor = (status) => {
+  if (status === 'SUBMITTED') return { background: '#f3f4f6', color: '#6b7280' };
+  if (status === 'ASSIGNED') return { background: '#eff6ff', color: '#2563eb' };
+  if (status === 'QUOTED') return { background: '#f5f3ff', color: '#7c3aed' };
+  if (status === 'NEGOTIATING') return { background: '#fffbeb', color: '#d97706' };
+  if (status === 'APPROVED') return { background: '#ecfdf5', color: '#059669' };
+  return { background: '#fef2f2', color: '#dc2626' };
 };
 
 const StaffCustomOrderDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [order, setOrder] = useState(mockOrder);
-  const [uploadingItemId, setUploadingItemId] = useState(null);
-  const [previewFile, setPreviewFile] = useState(null);
-  const [note, setNote] = useState("");
+  const { user } = useAuth();
 
-  const updateItemStatus = (itemId, newStatus) => {
-    setOrder((prev) => ({
-      ...prev,
-      items: prev.items.map((item) =>
-        item.id === itemId ? { ...item, fulfillmentStatus: newStatus } : item
-      ),
-    }));
+  const [order, setOrder] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
+
+  // Chat
+  const [chatMessage, setChatMessage] = useState("");
+  const messagesContainerRef = useRef(null);
+
+  useEffect(() => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [order?.messages]);
+
+  // Quote panel
+  const [showQuotePanel, setShowQuotePanel] = useState(false);
+  const [quotePrice, setQuotePrice] = useState(0);
+  const [quoteNote, setQuoteNote] = useState("");
+  const [designFileUrl, setDesignFileUrl] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const glbFileInputRef = useRef(null);
+
+  useEffect(() => {
+    fetchDetail();
+
+    const token = localStorage.getItem('token');
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://103.90.227.51:8080/';
+    const hubUrl = `${baseUrl.replace(/\/$/, '')}/hubs/mainflow-2-design`;
+
+    const connection = new HubConnectionBuilder()
+      .withUrl(hubUrl, { accessTokenFactory: () => token })
+      .withAutomaticReconnect()
+      .configureLogging(LogLevel.Information)
+      .build();
+
+    connection.start()
+      .then(() => {
+        connection.invoke("JoinDesignWork", id).catch(console.error);
+        connection.on("Mainflow2Event", () => fetchDetail(true));
+      })
+      .catch(err => console.error("SignalR Error:", err));
+
+    return () => {
+      connection.invoke("LeaveDesignWork", id).catch(console.error);
+      connection.stop();
+    };
+  }, [id]);
+
+  const fetchDetail = async (silent = false) => {
+    try {
+      if (!silent && !order) setLoading(true);
+      const res = await getDesignRequestDetail(id);
+      if (res?.statusCode === 200) setOrder(res.data);
+      else message.error(res?.message || 'Không tìm thấy chi tiết yêu cầu');
+    } catch {
+      message.error('Lỗi khi lấy chi tiết yêu cầu');
+    } finally {
+      if (!silent) setLoading(false);
+    }
   };
 
-  const handleUploadDesignVersion = (itemId) => {
-    if (!previewFile) return alert("Chọn file trước!");
-
-    setOrder((prev) => ({
-      ...prev,
-      items: prev.items.map((item) =>
-        item.id === itemId
-          ? {
-            ...item,
-            fulfillmentStatus: "WAITING_REVIEW",
-            designVersions: [
-              ...(item.designVersions || []),
-              {
-                id: `DVH-NEW-${Date.now()}`,
-                versionNumber: (item.designVersions?.length || 0) + 1,
-                fileUrl: `/designs/${previewFile.name}`,
-                uploaderId: "STAFF-001",
-                isPreviewable: true,
-                isPrintable: false,
-                createdAt: new Date().toLocaleString(),
-                status: "PENDING",
-                note,
-              },
-            ],
-          }
-          : item
-      ),
-    }));
-
-    setUploadingItemId(null);
-    setPreviewFile(null);
-    setNote("");
+  const handleAssign = () => {
+    Modal.confirm({
+      title: 'Tiếp nhận yêu cầu',
+      content: 'Bạn xác nhận phụ trách đơn này?',
+      okText: 'Xác nhận',
+      onOk: async () => {
+        try {
+          setProcessing(true);
+          const res = await assignStaffToRequest(id);
+          if (res?.statusCode === 200) { message.success('Đã nhận việc!'); fetchDetail(); }
+          else message.error(res?.message || 'Lỗi khi nhận việc');
+        } catch { message.error('Lỗi khi tiếp nhận'); }
+        finally { setProcessing(false); }
+      }
+    });
   };
+
+  const handleSendChat = async () => {
+    if (!chatMessage.trim()) return;
+    try {
+      const res = await postDesignRequestMessage(id, { content: chatMessage, attachmentUrls: [] });
+      if (res?.statusCode === 200) { setChatMessage(""); fetchDetail(true); }
+      else message.error(res?.message || 'Lỗi gửi tin');
+    } catch { message.error("Lỗi khi gửi tin nhắn"); }
+  };
+
+  const handleSubmitQuote = async () => {
+    if (quotePrice <= 0) return message.warning("Giá báo phải lớn hơn 0");
+    if (!quoteNote.trim()) return message.warning("Vui lòng nhập ghi chú báo giá");
+    try {
+      setProcessing(true);
+      const res = await submitQuote(id, {
+        quotedPrice: quotePrice,
+        currency: "VND",
+        staffNote: quoteNote,
+        designFileUrls: designFileUrl ? [designFileUrl] : []
+      });
+      if (res?.statusCode === 200) {
+        message.success('Báo giá thành công!');
+        setShowQuotePanel(false);
+        setDesignFileUrl("");
+        setQuoteNote("");
+        setQuotePrice(0);
+        fetchDetail();
+      } else message.error(res?.message || 'Lỗi gửi báo giá');
+    } catch { message.error("Lỗi báo giá"); }
+    finally { setProcessing(false); }
+  };
+
+  const handleCancel = () => {
+    Modal.confirm({
+      title: 'Hủy yêu cầu',
+      content: 'Hành động này không thể hoàn tác.',
+      okText: 'Hủy yêu cầu',
+      okType: 'danger',
+      cancelText: 'Bỏ qua',
+      onOk: async () => {
+        try {
+          setProcessing(true);
+          const res = await cancelDesignRequest(id);
+          if (res?.statusCode === 200) { message.success('Đã hủy!'); fetchDetail(); }
+          else message.error(res?.message || 'Lỗi khi hủy');
+        } catch { message.error('Lỗi khi hủy'); }
+        finally { setProcessing(false); }
+      }
+    });
+  };
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 64px)' }}>
+        <Spin size="large" />
+      </div>
+    );
+  }
+
+  if (!order) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 64px)' }}>
+        <h2 style={{ fontWeight: 700, color: '#111827' }}>Không tìm thấy yêu cầu</h2>
+        <Link to="/staff/custom-orders" style={{ color: '#4f46e5' }}>Quay lại danh sách</Link>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <Link
-              to="/staff/custom-orders"
-              className="w-10 h-10 bg-white border border-gray-200 rounded-lg flex items-center justify-center text-gray-600 hover:bg-gray-50 shadow-sm"
-            >
-              ←
-            </Link>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-800">Order #{order.id}</h1>
-              <p className="text-gray-500 text-sm">CreatedAt: {order.createdAt} | Priority: P{order.priority}</p>
-            </div>
+    <div style={{ height: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#f8fafc' }}>
+
+      {/* TOPBAR */}
+      <div style={{ flexShrink: 0, background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '0 20px', height: 56, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <Link to="/staff/custom-orders"
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, border: '1px solid #e5e7eb', color: '#374151', textDecoration: 'none', fontSize: 16 }}>
+          ←
+        </Link>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ margin: 0, fontWeight: 700, fontSize: 15, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{order.title}</p>
+          <p style={{ margin: 0, fontSize: 11, color: '#9ca3af', fontFamily: 'monospace' }}>#{order.id?.slice(0, 8)}</p>
+        </div>
+        <span style={{ padding: '3px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, ...statusColor(order.status) }}>
+          {STATUS_LABEL[order.status] || order.status}
+        </span>
+        {order.status !== 'CANCELLED' && order.status !== 'APPROVED' && (
+          <button onClick={handleCancel} disabled={processing}
+            style={{ padding: '4px 14px', borderRadius: 8, border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+            Hủy yêu cầu
+          </button>
+        )}
+      </div>
+
+      {/* BODY */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+
+        {/* CHAT COLUMN */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+
+          {/* Messages list */}
+          <div ref={messagesContainerRef}
+            style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+            {/* Messages + inline quotes */}
+            {order.messages?.length > 0 ? order.messages.map((msg, i) => {
+              const isMe = msg.authorAccountId === user?.id;
+              const isQuote = msg.logType && msg.logType.toUpperCase().includes('QUOTE');
+
+              if (isQuote) {
+                let meta = null;
+                try { meta = msg.metadataJson ? JSON.parse(msg.metadataJson) : null; } catch { }
+                return (
+                  <div key={i} style={{ alignSelf: msg.authorAccountId === user?.id ? 'flex-end' : 'flex-start', width: '100%', marginBottom: 12 }}>
+                    <div style={{ background: '#ecfdf5', border: '1px solid #6ee7b7', borderRadius: '16px 16px 16px 4px', padding: '12px 16px' }}>
+                      <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: 1 }}>
+                        💰 Báo giá{meta?.revisionNumber ? ` rev ${meta.revisionNumber}` : ''}
+                      </p>
+                      {meta?.quotedPrice != null && (
+                        <p style={{ margin: '0 0 6px', fontSize: 22, fontWeight: 800, color: '#065f46' }}>
+                          {formatPrice(meta.quotedPrice)}
+                        </p>
+                      )}
+                      {/* {msg.content && <p style={{ margin: '0 0 6px', fontSize: 13, color: '#374151' }}>{msg.content}</p>} */}
+                      {meta?.designFileUrls?.filter(u => u && u.trim() !== "").length > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12, padding: '12px', background: 'rgba(255,255,255,0.9)', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)' }}>
+                          {[...new Set(meta.designFileUrls.filter(u => u && u.trim() !== ""))].slice(1).map((url, fi) => {
+                            const lowUrl = url.toLowerCase();
+                            const isGLB = lowUrl.endsWith('.glb');
+                            const isImage = lowUrl.endsWith('.png') || lowUrl.endsWith('.jpg') || lowUrl.endsWith('.jpeg') || lowUrl.endsWith('.webp');
+
+                            if (isGLB) {
+                              return (
+                                <div key={fi} style={{ position: 'relative' }}>
+                                  <div style={{ width: '100%', height: 260, borderRadius: 8, overflow: 'hidden', background: 'linear-gradient(to bottom, #f8fafc, #f1f5f9)', border: '1px solid #e2e8f0' }}>
+                                    <model-viewer
+                                      src={url}
+                                      camera-controls
+                                      auto-rotate
+                                      shadow-intensity="1"
+                                      environment-image="neutral"
+                                      exposure="1"
+                                      style={{ width: '100%', height: '100%' }}
+                                    />
+                                  </div>
+                                  <a href={url} target="_blank" rel="noreferrer"
+                                    style={{ position: 'absolute', bottom: 8, right: 8, background: 'rgba(255,255,255,0.9)', padding: '5px 10px', borderRadius: 6, fontSize: 11, color: '#475569', textDecoration: 'none', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
+                                    <span>💾</span> Tải về GLB
+                                  </a>
+                                </div>
+                              );
+                            }
+
+                            if (isImage) {
+                              return (
+                                <a key={fi} href={url} target="_blank" rel="noreferrer" style={{ display: 'block', borderRadius: 8, overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+                                  <img src={url} alt="" style={{ width: '100%', maxHeight: 300, objectFit: 'contain', display: 'block', background: '#f8fafc' }} />
+                                </a>
+                              );
+                            }
+
+                            return (
+                              <a key={fi} href={url} target="_blank" rel="noreferrer"
+                                style={{ fontSize: 13, color: '#2563eb', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: '#fff', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                                <span style={{ fontSize: 18 }}>📎</span>
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500, maxWidth: 260 }}>{url.split('/').pop()}</span>
+                              </a>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    <span style={{ fontSize: 10, color: '#9ca3af', marginTop: 3, display: 'block' }}>
+                      {new Date(msg.created).toLocaleString('vi-VN')} · Nhân viên
+                    </span>
+                  </div>
+                );
+              }
+
+              return (
+                <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
+                  <div style={{
+                    padding: '8px 14px',
+                    borderRadius: isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                    maxWidth: '70%', fontSize: 14, lineHeight: 1.5, wordBreak: 'break-word',
+                    background: isMe ? '#4f46e5' : '#fff',
+                    color: isMe ? '#fff' : '#1f2937',
+                    border: isMe ? 'none' : '1px solid #e5e7eb',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                  }}>
+                    {msg.content}
+                  </div>
+                  <span style={{ fontSize: 10, color: '#9ca3af', marginTop: 3 }}>
+                    {new Date(msg.created).toLocaleString('vi-VN')} · {isMe ? 'Tôi' : 'Khách'}
+                  </span>
+                </div>
+              );
+            }) : (
+              <div style={{ textAlign: 'center', color: '#9ca3af', fontSize: 13, marginTop: 40 }}>Chưa có tin nhắn nào. Hãy bắt đầu trao đổi!</div>
+            )}
           </div>
-          <span className={`px-4 py-2 rounded-lg font-medium ${orderStatusConfig[order.orderStatus]?.color}`}>
-            {orderStatusConfig[order.orderStatus]?.label}
-          </span>
+
+          {/* Quote panel (inline above composer) */}
+          {showQuotePanel && (
+            <div style={{ flexShrink: 0, background: '#f8fafc', borderTop: '1px solid #e5e7eb', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: '#065f46' }}>💰 Tạo báo giá mới</p>
+                <button onClick={() => setShowQuotePanel(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 18, padding: 0 }}>×</button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Mức giá (VND)</label>
+                  <InputNumber
+                    style={{ width: '100%' }}
+                    min={0} step={10000}
+                    value={quotePrice}
+                    onChange={v => setQuotePrice(v)}
+                    formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                    parser={v => v?.replace(/\$\s?|(\.*)/g, '')}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>File 3D (GLB/OBJ/STL)</label>
+                  <input ref={glbFileInputRef} type="file" accept=".glb,.obj,.stl" style={{ display: 'none' }}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      try {
+                        setUploading(true);
+                        const res = await uploadFile(file);
+                        if (res?.data?.publicUrl) { setDesignFileUrl(res.data.publicUrl); message.success('Upload thành công!'); }
+                        else message.error('Upload thất bại');
+                      } catch { message.error('Lỗi upload file'); }
+                      finally { setUploading(false); }
+                    }}
+                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                    <Button size="small" loading={uploading} onClick={() => glbFileInputRef.current?.click()}>
+                      📂 {uploading ? 'Đang upload...' : 'Chọn file'}
+                    </Button>
+                    {designFileUrl
+                      ? <span style={{ fontSize: 11, color: '#059669', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>✓ {designFileUrl.split('/').pop()}</span>
+                      : <span style={{ fontSize: 11, color: '#9ca3af' }}>Chưa chọn</span>
+                    }
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Ghi chú báo giá</label>
+                <Input.TextArea rows={2} value={quoteNote} onChange={e => setQuoteNote(e.target.value)} placeholder="Mô tả nội dung, cam kết..." />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <Button onClick={() => setShowQuotePanel(false)}>Hủy</Button>
+                <Button type="primary" style={{ background: '#059669' }} onClick={handleSubmitQuote} loading={processing}>Gửi báo giá</Button>
+              </div>
+            </div>
+          )}
+
+          {/* Composer */}
+          <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+            {order.status === 'SUBMITTED' ? (
+              <div style={{ flex: 1, textAlign: 'center' }}>
+                <p style={{ margin: '0 0 8px 0', color: '#6b7280', fontSize: 13 }}>Bạn chưa nhận việc. Tiếp nhận để bắt đầu trao đổi.</p>
+                <Button type="primary" style={{ background: '#4f46e5' }} onClick={handleAssign} loading={processing}>Tiếp nhận xử lý</Button>
+              </div>
+            ) : order.status === 'CANCELLED' ? (
+              <div style={{ flex: 1, textAlign: 'center', color: '#dc2626', fontSize: 13, fontWeight: 500 }}>Yêu cầu đã bị hủy.</div>
+            ) : order.status === 'APPROVED' ? (
+              <div style={{ flex: 1, textAlign: 'center', color: '#059669', fontSize: 13, fontWeight: 600 }}>🎉 Khách đã duyệt! Giá cuối: {formatPrice(order.latestQuotedPrice)}</div>
+            ) : (
+              <>
+                {['ASSIGNED', 'QUOTED', 'NEGOTIATING'].includes(order.status) && (
+                  <Button onClick={() => setShowQuotePanel(v => !v)}
+                    style={{ flexShrink: 0, background: showQuotePanel ? '#059669' : '#ecfdf5', borderColor: '#6ee7b7', color: showQuotePanel ? '#fff' : '#059669', fontWeight: 600 }}>
+                    💰 Báo giá
+                  </Button>
+                )}
+                <Input.TextArea
+                  autoSize={{ minRows: 1, maxRows: 4 }}
+                  value={chatMessage}
+                  onChange={e => setChatMessage(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendChat(); } }}
+                  placeholder="Nhập tin nhắn... (Enter để gửi, Shift+Enter xuống dòng)"
+                  style={{ flex: 1, resize: 'none', borderRadius: 12, fontSize: 14 }}
+                />
+                <Button type="primary"
+                  style={{ background: '#4f46e5', flexShrink: 0, height: 36, borderRadius: 12 }}
+                  disabled={!chatMessage.trim()} onClick={handleSendChat}>
+                  Gửi →
+                </Button>
+              </>
+            )}
+          </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-6">
-          {/* Left - OrderItems */}
-          <div className="col-span-2 space-y-4">
-            <h2 className="text-lg font-semibold text-gray-800">
-              📦 OrderItems ({order.items.length})
-            </h2>
+        {/* RIGHT SIDEBAR */}
+        <div style={{ width: 260, flexShrink: 0, overflowY: 'auto', background: '#fff', borderLeft: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column' }}>
 
-            {order.items.map((item) => (
-              <div key={item.id} className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
-                {/* Item Header */}
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-start gap-4">
-                    <div className="w-14 h-14 bg-gray-100 rounded-xl flex items-center justify-center text-3xl">
-                      {sourceTypeConfig[item.sourceType]?.icon}
-                    </div>
-                    <div>
-                      <h3 className="text-gray-800 font-semibold">
-                        {item.designVariant?.name || item.customerFile?.fileName || `Design Work #${item.designWork?.id}`}
-                      </h3>
-                      <div className="flex flex-wrap items-center gap-2 mt-1 text-sm">
-                        <span className={sourceTypeConfig[item.sourceType]?.color}>
-                          {sourceTypeConfig[item.sourceType]?.label}
-                        </span>
-                        <span className="text-gray-300">•</span>
-                        <span className="text-gray-500">Qty: {item.quantityOrdered}</span>
-                        <span className="text-gray-300">•</span>
-                        <span className="text-gray-500">Unit: {item.unitPrice.toLocaleString()}đ</span>
-                        <span className="text-gray-300">•</span>
-                        <span className="text-green-600 font-medium">Total: {item.totalPrice.toLocaleString()}đ</span>
-                      </div>
-                      <p className="text-gray-400 text-xs mt-1">ID: {item.id}</p>
-                    </div>
-                  </div>
-                  <span className={`px-3 py-1.5 rounded-lg text-sm font-medium ${fulfillmentStatusConfig[item.fulfillmentStatus]?.color}`}>
-                    {fulfillmentStatusConfig[item.fulfillmentStatus]?.icon} {fulfillmentStatusConfig[item.fulfillmentStatus]?.label}
-                  </span>
-                </div>
-
-                {/* PREMADE Item */}
-                {item.sourceType === "PREMADE" && (
-                  <div className="pt-4 border-t border-gray-100">
-                    <div className="bg-gray-50 rounded-lg p-3 mb-3">
-                      <p className="text-gray-500 text-xs mb-1">Design_Variant</p>
-                      <p className="text-gray-800 font-medium">{item.designVariant?.code} - {item.designVariant?.name}</p>
-                      <p className="text-gray-400 text-xs">Preview: {item.designVariant?.previewModelUrl}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => updateItemStatus(item.id, "PRINTING")} className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600">
-                        🖨️ Start Printing
-                      </button>
-                      <button onClick={() => updateItemStatus(item.id, "COMPLETED")} className="px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600">
-                        ✅ Complete
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* CUSTOMER_FILE Item */}
-                {item.sourceType === "CUSTOMER_FILE" && (
-                  <div className="pt-4 border-t border-gray-100 space-y-3">
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <p className="text-blue-700 text-xs mb-1">Customer Uploaded File</p>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-gray-800 font-medium">{item.customerFile?.fileName}</p>
-                          <p className="text-gray-400 text-xs">{item.customerFile?.fileSize} • {item.customerFile?.uploadedAt}</p>
-                        </div>
-                        <button className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600">⬇️ Download</button>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => updateItemStatus(item.id, "APPROVED")} className="px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600">
-                        ✅ Approve File
-                      </button>
-                      <button onClick={() => updateItemStatus(item.id, "REJECTED")} className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600">
-                        ❌ Reject
-                      </button>
-                      <button className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300">
-                        👁️ Preview 3D
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* DESIGN_WORK Item */}
-                {item.sourceType === "DESIGN_WORK" && (
-                  <div className="pt-4 border-t border-gray-100 space-y-4">
-                    {/* Customer Request */}
-                    {item.customerRequest && (
-                      <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
-                        <p className="text-purple-700 text-xs mb-1">💬 Customer Request (from Design_Message)</p>
-                        <p className="text-gray-700">{item.customerRequest}</p>
-                      </div>
+          {/* Timeline */}
+          <div style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
+            <p style={{ margin: '0 0 12px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>Tiến trình</p>
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 0 }}>
+              {CUSTOM_STATUS_STEPS.map((step, idx) => {
+                const currentIdx = STATUS_ORDER.indexOf(order.status);
+                const isDone = idx < currentIdx || (idx === currentIdx && order.status !== 'CANCELLED');
+                const isCurrent = idx === currentIdx && order.status !== 'CANCELLED';
+                return (
+                  <li key={step.key} style={{ display: 'flex', gap: 12, paddingBottom: idx < CUSTOM_STATUS_STEPS.length - 1 ? 16 : 0, position: 'relative' }}>
+                    {idx < CUSTOM_STATUS_STEPS.length - 1 && (
+                      <div style={{ position: 'absolute', left: 11, top: 24, width: 2, bottom: 0, background: isDone ? '#4f46e5' : '#e5e7eb' }} />
                     )}
-
-                    {/* Design_Version_History */}
-                    {item.designVersions?.length > 0 && (
-                      <div>
-                        <p className="text-gray-500 text-sm mb-2">📁 Design_Version_History:</p>
-                        <div className="space-y-2">
-                          {item.designVersions.map((v) => (
-                            <div key={v.id} className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
-                              <div className="flex items-center gap-3">
-                                <span className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center font-bold text-sm">v{v.versionNumber}</span>
-                                <div>
-                                  <p className="text-gray-800 text-sm font-medium">{v.fileUrl}</p>
-                                  <p className="text-gray-400 text-xs">
-                                    {v.createdAt} • Previewable: {v.isPreviewable ? '✓' : '✗'} • Printable: {v.isPrintable ? '✓' : '✗'}
-                                  </p>
-                                  {v.note && <p className="text-gray-500 text-xs mt-1">Note: {v.note}</p>}
-                                </div>
-                              </div>
-                              <span className={`px-2 py-1 rounded text-xs ${v.status === 'REJECTED' ? 'bg-red-100 text-red-700' :
-                                v.status === 'APPROVED' ? 'bg-green-100 text-green-700' :
-                                  'bg-gray-100 text-gray-600'
-                                }`}>
-                                {v.status}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Upload New Version */}
-                    {uploadingItemId === item.id ? (
-                      <div className="bg-gray-50 rounded-lg p-4 space-y-3 border border-gray-200">
-                        <p className="text-gray-800 font-medium">📤 Upload Design_Version_History</p>
-                        <input
-                          type="file"
-                          accept=".stl,.obj,.glb"
-                          onChange={(e) => setPreviewFile(e.target.files[0])}
-                          className="w-full text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-purple-500 file:text-white"
-                        />
-                        <textarea
-                          placeholder="Note..."
-                          className="w-full bg-white border border-gray-200 rounded-lg p-3 text-gray-800"
-                          rows={2}
-                          value={note}
-                          onChange={(e) => setNote(e.target.value)}
-                        />
-                        <div className="flex gap-2">
-                          <button onClick={() => handleUploadDesignVersion(item.id)} className="px-4 py-2 bg-purple-500 text-white rounded-lg text-sm font-medium">
-                            📤 Upload Version
-                          </button>
-                          <button onClick={() => setUploadingItemId(null)} className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm">
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <button onClick={() => setUploadingItemId(item.id)} className="w-full px-4 py-3 bg-purple-500 text-white rounded-lg font-medium hover:bg-purple-600">
-                        🎨 Upload New Design Version
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {/* Create ProductionJob */}
-                {["APPROVED", "READY_TO_PRINT"].includes(item.fulfillmentStatus) && (
-                  <div className="mt-4 pt-4 border-t border-gray-100">
-                    <button
-                      onClick={() => navigate(`/staff/custom-orders/${order.id}/items/${item.id}/production`)}
-                      className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg font-medium hover:bg-orange-600"
-                    >
-                      🖨️ Create ProductionJob
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
+                    <div style={{
+                      width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12,
+                      background: isCurrent ? '#4f46e5' : isDone ? '#4f46e5' : '#f3f4f6',
+                      color: isDone || isCurrent ? '#fff' : '#9ca3af',
+                      border: isCurrent ? '2px solid #a5b4fc' : 'none',
+                      zIndex: 1
+                    }}>
+                      {isDone && !isCurrent ? '✓' : idx + 1}
+                    </div>
+                    <p style={{ margin: 'auto 0', fontSize: 13, fontWeight: isCurrent ? 700 : 500, color: isCurrent ? '#4f46e5' : isDone ? '#111827' : '#9ca3af' }}>
+                      {step.label}
+                    </p>
+                  </li>
+                );
+              })}
+              {order.status === 'CANCELLED' && (
+                <li style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+                  <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#fef2f2', border: '1px solid #fca5a5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#dc2626' }}>✕</div>
+                  <p style={{ margin: 'auto 0', fontSize: 13, fontWeight: 600, color: '#dc2626' }}>Đã hủy</p>
+                </li>
+              )}
+            </ul>
           </div>
 
-          {/* Right Sidebar */}
-          <div className="space-y-4">
-            {/* Customer Info */}
-            <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
-              <h3 className="text-gray-800 font-semibold mb-4">👤 Customer (Account)</h3>
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
-                    {order.customer.fullname.charAt(0)}
-                  </div>
-                  <div>
-                    <p className="text-gray-800 font-medium">{order.customer.fullname}</p>
-                    <p className="text-gray-400 text-sm">{order.customer.email}</p>
-                  </div>
-                </div>
-                <div className="pt-3 space-y-2 border-t border-gray-100 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Contact_Phone</span>
-                    <span className="text-gray-800">{order.customer.contactPhone}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Customer_Id</span>
-                    <span className="text-gray-600 font-mono text-xs">{order.customer.id}</span>
-                  </div>
-                </div>
-              </div>
+          {/* Quote summary */}
+          {order.latestQuotedPrice != null && (
+            <div style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
+              <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>Báo giá</p>
+              <p style={{ margin: 0, fontSize: 20, fontWeight: 800, color: '#065f46' }}>{formatPrice(order.latestQuotedPrice)}</p>
+              <p style={{ margin: '2px 0 0', fontSize: 11, color: '#9ca3af' }}>Revision {order.quoteRevision}</p>
             </div>
+          )}
 
-            {/* Shipping Address */}
-            <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
-              <h3 className="text-gray-800 font-semibold mb-4">📍 ShippingAddress</h3>
-              <div className="space-y-2 text-sm">
-                <p className="text-gray-800 font-medium">{order.shippingAddress.receiverName}</p>
-                <p className="text-gray-600">{order.shippingAddress.phone}</p>
-                <p className="text-gray-600">
-                  {order.shippingAddress.addressLine}, {order.shippingAddress.ward}, {order.shippingAddress.district}, {order.shippingAddress.city}
-                </p>
-                {order.shippingAddress.isDefault && (
-                  <span className="inline-block px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">Default</span>
-                )}
+          {/* File versions */}
+          {order.quoteFileVersions?.length > 0 && (
+            <div style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
+              <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>File đính kèm</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {order.quoteFileVersions.map((f, i) => (
+                  <a key={i} href={f.fileUrl || f.url} target="_blank" rel="noreferrer"
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#f0f4ff', borderRadius: 8, textDecoration: 'none', border: '1px solid #e0e7ff' }}>
+                    <span style={{ fontSize: 18 }}>📦</span>
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#3730a3', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.title || `File v${f.versionNumber}`}</p>
+                      <p style={{ margin: 0, fontSize: 10, color: '#6b7280' }}>Phiên bản {f.versionNumber}</p>
+                    </div>
+                  </a>
+                ))}
               </div>
             </div>
+          )}
 
-            {/* Invoice */}
-            <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
-              <h3 className="text-gray-800 font-semibold mb-4">💰 Invoice</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">InvoiceCode</span>
-                  <span className="text-gray-800 font-mono">{order.invoice.invoiceCode}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">SubTotal</span>
-                  <span className="text-gray-800">{order.invoice.subTotal.toLocaleString()}đ</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">ShippingFee</span>
-                  <span className="text-gray-800">{order.invoice.shippingFee.toLocaleString()}đ</span>
-                </div>
-                <div className="pt-2 border-t border-gray-100 flex justify-between">
-                  <span className="text-gray-800 font-semibold">TotalAmount</span>
-                  <span className="text-green-600 font-bold">{order.invoice.totalAmount.toLocaleString()}đ</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">PaymentStatus</span>
-                  <span className={`px-2 py-0.5 rounded text-xs ${order.invoice.paymentStatus === 'PAID' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                    {order.invoice.paymentStatus}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
-              <h3 className="text-gray-800 font-semibold mb-4">⚡ Actions</h3>
-              <div className="space-y-2">
-                <button className="w-full px-4 py-2.5 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600">
-                  💬 Contact Customer
-                </button>
-                <button className="w-full px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200">
-                  🖨️ Print Invoice
-                </button>
-              </div>
-            </div>
+          {/* Customer info */}
+          <div style={{ padding: '16px' }}>
+            <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>Khách hàng</p>
+            <p style={{ margin: 0, fontSize: 11, fontFamily: 'monospace', color: '#374151', wordBreak: 'break-all' }}>{order.customerId}</p>
           </div>
         </div>
       </div>

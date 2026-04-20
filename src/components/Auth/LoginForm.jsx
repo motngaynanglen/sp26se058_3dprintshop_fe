@@ -29,7 +29,7 @@ const LoginForm = ({ onSuccess }) => {
 
                 const role = result.user?.role?.toLowerCase();
                 if (role === 'manager') navigate('/manager/dashboard');
-                else if (role === 'admin') navigate('/admin/dashboard');
+                else if (role === 'admin') navigate('/admin');
                 else if (['employee', 'staff'].includes(role)) navigate('/staff/dashboard');
                 else navigate('/');
             } else {

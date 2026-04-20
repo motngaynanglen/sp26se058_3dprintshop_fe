@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useCart } from '../contexts/CartContext';
+import React, { useEffect, useState } from 'react';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+
 import '@google/model-viewer';
 
 // ─── GLB FILES (local)
@@ -15,6 +15,9 @@ import glbModel3 from '../components/imgs/glb/model3.glb';
 import glbModel4 from '../components/imgs/glb/model4.glb';
 import glbModel5 from '../components/imgs/glb/model5.glb';
 import glbModel6 from '../components/imgs/glb/model6.glb';
+import materialApi from '../api/materialApi';
+import designTemplateApi from '../api/designTemplateApi';
+import designVariantApi from '../api/designVariantApi';
 
 // ─── PRODUCT CATALOG với 11 sản phẩm từ file GLB thật
 const PRODUCTS = [
@@ -34,7 +37,7 @@ const PRODUCTS = [
 // ─── MODEL CARD COMPONENT (Grid + List mode)
 const ProductCard = ({ product, viewMode }) => {
   const [hovered, setHovered] = useState(false);
-  const { addToCart } = useCart();
+  const navigate = useNavigate();
   const formatPrice = (v) => `${v.toLocaleString('vi-VN')} đ`;
 
   const isGrid = viewMode === 'grid';
@@ -42,17 +45,15 @@ const ProductCard = ({ product, viewMode }) => {
   return (
     <Link
       to={`/products/${product.id}`}
-      className={`group rounded-xl bg-white border border-slate-200 shadow-sm overflow-hidden no-underline cursor-pointer hover:shadow-md transition-shadow duration-200 ${
-        isGrid ? 'flex flex-col' : 'flex flex-row'
-      }`}
+      className={`group rounded-xl bg-white border border-slate-200 shadow-sm overflow-hidden no-underline cursor-pointer hover:shadow-md transition-shadow duration-200 ${isGrid ? 'flex flex-col' : 'flex flex-row'
+        }`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
       {/* Model Viewer */}
       <div
-        className={`relative bg-slate-50 flex-shrink-0 overflow-hidden ${
-          isGrid ? 'aspect-[4/3]' : 'w-32 sm:w-44 h-28 sm:h-36'
-        }`}
+        className={`relative bg-slate-50 flex-shrink-0 overflow-hidden ${isGrid ? 'aspect-[4/3]' : 'w-32 sm:w-44 h-28 sm:h-36'
+          }`}
       >
         <model-viewer
           src={product.modelSrc}
@@ -86,9 +87,8 @@ const ProductCard = ({ product, viewMode }) => {
         <p className="text-[11px] text-slate-500 m-0">
           {product.category} • {product.material}
         </p>
-        <p className={`text-[11px] font-medium m-0 ${
-          product.stock <= 5 ? 'text-rose-500' : 'text-emerald-600'
-        }`}>
+        <p className={`text-[11px] font-medium m-0 ${product.stock <= 5 ? 'text-rose-500' : 'text-emerald-600'
+          }`}>
           {product.stock <= 5 ? `Chỉ còn ${product.stock} sản phẩm` : `Còn ${product.stock} sản phẩm`}
         </p>
 
@@ -100,11 +100,17 @@ const ProductCard = ({ product, viewMode }) => {
             type="button"
             onClick={(e) => {
               e.preventDefault();
-              addToCart(product, 1, product.materials && product.materials[0] ? product.materials[0] : 'PLA');
+              navigate('/checkout', {
+                state: {
+                  product,
+                  quantity: 1,
+                  material: product.materials && product.materials[0] ? product.materials[0] : 'PLA',
+                }
+              });
             }}
             className="hidden sm:inline-flex items-center justify-center rounded-full border border-indigo-500 px-3 py-1 text-[11px] font-medium text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors cursor-pointer"
           >
-            Thêm vào giỏ
+            Mua ngay
           </button>
         </div>
 
@@ -121,18 +127,37 @@ const ProductCard = ({ product, viewMode }) => {
 // ─── MAIN COMPONENT
 const ProductCatalog = () => {
   const [viewMode, setViewMode] = useState('grid');
-  const [filters, setFilters] = useState({ category: '', priceRange: '', material: '' });
+  const [selectedMaterial, setSelectedMaterial] = useState('');
+  const [listMaterial, setListMaterial] = useState([]);
+  const [listProduct, setListProduct] = useState([]);
+  const [searchParams] = useSearchParams();
+  const categoryFromUrl = searchParams.get('category');
+  console.log('category:', categoryFromUrl);
+
+
+  const fetchMaterials = async () => {
+    const response = await materialApi.getAll();
+    setListMaterial(response.data);
+  };
+
+  useEffect(() => {
+    fetchMaterials();
+  }, []);
 
   const filteredProducts = PRODUCTS.filter((p) => {
-    if (filters.category && p.category !== filters.category) return false;
-    if (filters.material && p.material !== filters.material) return false;
-    if (filters.priceRange) {
-      if (filters.priceRange === '0-200' && p.price > 200000) return false;
-      if (filters.priceRange === '200-500' && (p.price < 200000 || p.price > 500000)) return false;
-      if (filters.priceRange === '500+' && p.price < 500000) return false;
-    }
+    if (selectedMaterial && p.material !== selectedMaterial) return false;
     return true;
   });
+
+  const handleMaterialChange = async (materialId) => {
+    console.log(materialId);
+    const designTemplateId = searchParams.get('category')
+    const response = await designVariantApi.getAll({ materialId, designTemplateId, isActive: true })
+    console.log(response);
+    setListProduct(response.data);
+  }
+
+
 
   return (
     <div className="space-y-5">
@@ -155,11 +180,10 @@ const ProductCatalog = () => {
             <button
               key={mode}
               onClick={() => setViewMode(mode)}
-              className={`flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-all cursor-pointer ${
-                viewMode === mode
-                  ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
-                  : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-400'
-              }`}
+              className={`flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-all cursor-pointer ${viewMode === mode
+                ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-400'
+                }`}
             >
               {label}
             </button>
@@ -167,107 +191,64 @@ const ProductCatalog = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)] gap-5">
-        {/* Sidebar filter */}
-        <aside className="h-fit rounded-xl bg-white border border-slate-200 shadow-sm lg:sticky lg:top-28">
-          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-            <h3 className="m-0 text-sm font-semibold text-slate-900">Bộ lọc tìm kiếm</h3>
+      {/* Material Tags */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold text-slate-700 mr-1">Chất liệu:</span>
+        <button
+          type="button"
+          onClick={() => handleMaterialChange()}
+          className={`rounded-full border px-3 py-1 text-xs font-medium transition-all cursor-pointer ${selectedMaterial === ''
+            ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
+            : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-400 hover:text-indigo-600'
+            }`}
+        >
+          Tất cả
+        </button>
+        {listMaterial.map((material) => (
+          <button
+            key={material.id}
+            type="button"
+            onClick={() => handleMaterialChange(material.id)}
+            className={`rounded-full border px-3 py-1 text-xs font-medium transition-all cursor-pointer ${selectedMaterial === material.name
+              ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
+              : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-400 hover:text-indigo-600'
+              }`}
+          >
+            {material.name}
+          </button>
+        ))}
+      </div>
+
+      {/* Product list */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between text-[11px] text-slate-500">
+          <span>Tìm thấy <b>{filteredProducts.length}</b> sản phẩm</span>
+          <span>Giá đã bao gồm chi phí vật liệu in cơ bản</span>
+        </div>
+
+        <div
+          className={
+            viewMode === 'grid'
+              ? 'grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4'
+              : 'flex flex-col gap-3'
+          }
+        >
+          {listProduct.map((product) => (
+            <ProductCard key={product.id} product={product} viewMode={viewMode} />
+          ))}
+        </div>
+
+        {listProduct.length === 0 && (
+          <div className="py-16 text-center text-slate-500">
+            <p className="font-medium">Không tìm thấy sản phẩm nào</p>
             <button
-              type="button"
-              className="text-[11px] font-medium text-indigo-600 hover:underline cursor-pointer"
-              onClick={() => setFilters({ category: '', priceRange: '', material: '' })}
+              className="mt-3 text-sm text-indigo-600 hover:underline cursor-pointer"
+              onClick={() => setSelectedMaterial('')}
             >
-              Xóa lọc
+              Xóa bộ lọc
             </button>
           </div>
-
-          <div className="px-4 py-3 space-y-4 text-xs">
-            {[
-              {
-                key: 'category',
-                label: 'Danh mục',
-                options: [
-                  { value: '', label: 'Tất cả' },
-                  { value: 'Mô hình trang trí', label: 'Mô hình trang trí' },
-                  { value: 'Quà tặng / lưu niệm', label: 'Quà tặng / lưu niệm' },
-                  { value: 'Phụ kiện công nghệ', label: 'Phụ kiện công nghệ' },
-                  { value: 'Linh kiện kỹ thuật', label: 'Linh kiện kỹ thuật' },
-                  { value: 'Mô hình kiến trúc', label: 'Mô hình kiến trúc' },
-                ],
-              },
-              {
-                key: 'material',
-                label: 'Vật liệu',
-                options: [
-                  { value: '', label: 'Tất cả' },
-                  { value: 'PLA', label: 'PLA' },
-                  { value: 'TPU', label: 'TPU dẻo' },
-                  { value: 'Resin', label: 'Resin' },
-                ],
-              },
-              {
-                key: 'priceRange',
-                label: 'Khoảng giá',
-                options: [
-                  { value: '', label: 'Tất cả' },
-                  { value: '0-200', label: 'Dưới 200.000 đ' },
-                  { value: '200-500', label: '200.000 - 500.000 đ' },
-                  { value: '500+', label: 'Trên 500.000 đ' },
-                ],
-              },
-            ].map(({ key, label, options }) => (
-              <div key={key}>
-                <p className="mb-1 font-semibold text-slate-700">{label}</p>
-                <select
-                  value={filters[key]}
-                  onChange={(e) => setFilters({ ...filters, [key]: e.target.value })}
-                  className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-indigo-500 cursor-pointer"
-                >
-                  {options.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              </div>
-            ))}
-
-            <div className="rounded-lg bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
-              Gợi ý: nếu bạn chỉ cần tham khảo giá để đặt in mẫu riêng, hãy dùng tính năng{' '}
-              <span className="font-semibold text-indigo-600">Đặt in theo yêu cầu</span> ở menu trên.
-            </div>
-          </div>
-        </aside>
-
-        {/* Product list */}
-        <main className="space-y-3">
-          <div className="flex items-center justify-between text-[11px] text-slate-500">
-            <span>Tìm thấy <b>{filteredProducts.length}</b> sản phẩm</span>
-            <span>Giá đã bao gồm chi phí vật liệu in cơ bản</span>
-          </div>
-
-          <div
-            className={
-              viewMode === 'grid'
-                ? 'grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4'
-                : 'flex flex-col gap-3'
-            }
-          >
-            {filteredProducts.map((product) => (
-              <ProductCard key={product.id} product={product} viewMode={viewMode} />
-            ))}
-          </div>
-
-          {filteredProducts.length === 0 && (
-            <div className="py-16 text-center text-slate-500">
-              <p className="font-medium">Không tìm thấy sản phẩm nào</p>
-              <button
-                className="mt-3 text-sm text-indigo-600 hover:underline cursor-pointer"
-                onClick={() => setFilters({ category: '', priceRange: '', material: '' })}
-              >
-                Xóa bộ lọc
-              </button>
-            </div>
-          )}
-        </main>
+        )}
       </div>
     </div>
   );

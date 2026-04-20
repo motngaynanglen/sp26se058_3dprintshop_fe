@@ -28,7 +28,7 @@ const AdminLoginPage = () => {
             } else if (['employee', 'staff'].includes(role)) {
                 navigate('/staff/dashboard');
             } else {
-                navigate('/admin/dashboard'); // Mặc định cho Admin
+                navigate('/admin'); // Mặc định cho Admin
             }
         } else {
             message.error(result.message);

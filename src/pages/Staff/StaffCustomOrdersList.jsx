@@ -1,132 +1,87 @@
-import React, { useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { message, Spin, Modal } from 'antd';
+import { getDesignRequests, assignStaffToRequest } from '../../api/mainflow2Api';
+
+const STATUS_CONFIG = {
+  SUBMITTED: { label: 'Mới gửi (Chờ nhận)', color: 'bg-gray-100 text-gray-800', icon: '📥' },
+  ASSIGNED: { label: 'Đã phân công', color: 'bg-blue-100 text-blue-800', icon: '👤' },
+  QUOTED: { label: 'Đã báo giá', color: 'bg-purple-100 text-purple-800', icon: '💰' },
+  NEGOTIATING: { label: 'Đang thương lượng', color: 'bg-yellow-100 text-yellow-800', icon: '💬' },
+  APPROVED: { label: 'Khách đã duyệt', color: 'bg-green-100 text-green-800', icon: '✅' },
+  CANCELLED: { label: 'Đã hủy', color: 'bg-red-100 text-red-800', icon: '❌' },
+};
 
 const StaffCustomOrdersList = () => {
-  const [searchParams] = useSearchParams();
-  const initialFilter = searchParams.get('status') || 'all';
-  const [filter, setFilter] = useState(initialFilter);
-  const [sourceTypeFilter, setSourceTypeFilter] = useState('all');
+  const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [assigningId, setAssigningId] = useState(null);
 
-  // Mock data based on DB schema: Order, OrderItem, Customer, Account, Design_Work
-  const orders = [
-    {
-      id: 'ORD-001',
-      customerId: 'CUST-001',
-      customerName: 'Nguyễn Văn An',
-      customerEmail: 'an@email.com',
-      customerPhone: '0901234567',
-      staffId: null,
-      totalPrice: 450000,
-      orderStatus: 'PENDING',
-      priority: 1,
-      createdAt: '2024-01-15 14:30',
-      itemCount: 3,
-      // From OrderItem
-      items: [
-        { sourceType: 'PREMADE', fulfillmentStatus: 'PENDING' },
-        { sourceType: 'DESIGN_WORK', fulfillmentStatus: 'DESIGNING' },
-        { sourceType: 'CUSTOMER_FILE', fulfillmentStatus: 'WAITING_REVIEW' },
-      ]
-    },
-    {
-      id: 'ORD-002',
-      customerId: 'CUST-002',
-      customerName: 'Trần Thị Bình',
-      customerEmail: 'binh@email.com',
-      customerPhone: '0902345678',
-      staffId: 'STAFF-001',
-      totalPrice: 350000,
-      orderStatus: 'PROCESSING',
-      priority: 2,
-      createdAt: '2024-01-14 10:15',
-      itemCount: 1,
-      items: [
-        { sourceType: 'DESIGN_WORK', fulfillmentStatus: 'DESIGNING' },
-      ]
-    },
-    {
-      id: 'ORD-003',
-      customerId: 'CUST-003',
-      customerName: 'Lê Hoàng Cường',
-      customerEmail: 'cuong@email.com',
-      customerPhone: '0903456789',
-      staffId: 'STAFF-001',
-      totalPrice: 280000,
-      orderStatus: 'PROCESSING',
-      priority: 1,
-      createdAt: '2024-01-13 16:45',
-      itemCount: 2,
-      items: [
-        { sourceType: 'AI_GENERATE', fulfillmentStatus: 'READY_FOR_PREVIEW' },
-        { sourceType: 'PREMADE', fulfillmentStatus: 'READY_TO_PRINT' },
-      ]
-    },
-    {
-      id: 'ORD-004',
-      customerId: 'CUST-004',
-      customerName: 'Phạm Minh Đức',
-      customerEmail: 'duc@email.com',
-      customerPhone: '0904567890',
-      staffId: 'STAFF-002',
-      totalPrice: 750000,
-      orderStatus: 'PRINTING',
-      priority: 3,
-      createdAt: '2024-01-12 09:00',
-      itemCount: 5,
-      items: [
-        { sourceType: 'CUSTOMER_FILE', fulfillmentStatus: 'PRINTING' },
-      ]
-    },
-    {
-      id: 'ORD-005',
-      customerId: 'CUST-005',
-      customerName: 'Hoàng Thu Hà',
-      customerEmail: 'ha@email.com',
-      customerPhone: '0905678901',
-      staffId: 'STAFF-001',
-      totalPrice: 200000,
-      orderStatus: 'COMPLETED',
-      priority: 1,
-      createdAt: '2024-01-11 11:30',
-      itemCount: 1,
-      items: [
-        { sourceType: 'DESIGN_WORK', fulfillmentStatus: 'COMPLETED' },
-      ]
-    },
-  ];
+  useEffect(() => {
+    fetchRequests();
+  }, [filter]);
 
-  // OrderStatus from Order table
-  const orderStatusConfig = {
-    PENDING: { label: 'Chờ xử lý', color: 'bg-yellow-100 text-yellow-800', icon: '⏳' },
-    PROCESSING: { label: 'Đang xử lý', color: 'bg-blue-100 text-blue-800', icon: '⚙️' },
-    PRINTING: { label: 'Đang in', color: 'bg-orange-100 text-orange-800', icon: '🖨️' },
-    SHIPPED: { label: 'Đã giao', color: 'bg-indigo-100 text-indigo-800', icon: '🚚' },
-    COMPLETED: { label: 'Hoàn thành', color: 'bg-green-100 text-green-800', icon: '✅' },
-    CANCELLED: { label: 'Đã hủy', color: 'bg-red-100 text-red-800', icon: '❌' },
+  const fetchRequests = async () => {
+    setLoading(true);
+    try {
+      const params = { pageNumber: 1, pageSize: 100 };
+      if (filter !== 'all') {
+        params.status = filter;
+      }
+      const res = await getDesignRequests(params);
+      if (res && res.statusCode === 200) {
+        setRequests(res.data || []);
+      } else {
+        message.error(res?.message || 'Lỗi lấy danh sách yêu cầu');
+      }
+    } catch (error) {
+      console.error(error);
+      message.error('Lỗi khi lấy danh sách yêu cầu');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // SourceType from OrderItem table
-  const sourceTypeConfig = {
-    PREMADE: { label: 'Sản phẩm có sẵn', icon: '📦', color: 'text-gray-600' },
-    CUSTOMER_FILE: { label: 'File khách upload', icon: '📤', color: 'text-blue-600' },
-    DESIGN_WORK: { label: 'Yêu cầu thiết kế', icon: '✏️', color: 'text-purple-600' },
-    AI_GENERATE: { label: 'AI Generate', icon: '🤖', color: 'text-green-600' },
+  const handleAssign = (id) => {
+    Modal.confirm({
+      title: 'Tiếp nhận yêu cầu',
+      content: 'Bạn sẽ phụ trách báo giá và trao đổi với khách hàng cho yêu cầu này?',
+      okText: 'Nhận việc',
+      cancelText: 'Hủy',
+      onOk: async () => {
+        try {
+          setAssigningId(id);
+          const res = await assignStaffToRequest(id);
+          if (res && res.statusCode === 200) {
+            message.success('Đã tiếp nhận yêu cầu thiết kế!');
+            fetchRequests(); // reload list
+          } else {
+            message.error(res?.message || 'Không thể tiếp nhận');
+          }
+        } catch (error) {
+          message.error('Lỗi khi tiếp nhận yêu cầu!');
+        } finally {
+          setAssigningId(null);
+        }
+      }
+    });
   };
 
-  const filteredOrders = orders.filter(order => {
-    if (filter !== 'all' && order.orderStatus !== filter) return false;
-    if (sourceTypeFilter !== 'all' && !order.items.some(i => i.sourceType === sourceTypeFilter)) return false;
-    if (searchTerm && !order.id.toLowerCase().includes(searchTerm.toLowerCase()) &&
-      !order.customerName.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+  const filteredRequests = requests.filter(req => {
+    if (searchTerm && !req.id.toLowerCase().includes(searchTerm.toLowerCase()) &&
+        !(req.title || '').toLowerCase().includes(searchTerm.toLowerCase())) {
+      return false;
+    }
     return true;
   });
 
   const stats = {
-    total: orders.length,
-    pending: orders.filter(o => o.orderStatus === 'PENDING').length,
-    processing: orders.filter(o => o.orderStatus === 'PROCESSING').length,
-    printing: orders.filter(o => o.orderStatus === 'PRINTING').length,
+    total: requests.length,
+    submitted: requests.filter(r => r.status === 'SUBMITTED').length,
+    assigned: requests.filter(r => r.status === 'ASSIGNED' || r.status === 'NEGOTIATING').length,
+    quoted: requests.filter(r => r.status === 'QUOTED').length,
   };
 
   return (
@@ -134,8 +89,8 @@ const StaffCustomOrdersList = () => {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">📦 Quản lý đơn hàng</h1>
-          <p className="text-gray-500 text-sm mt-1">Danh sách đơn hàng từ bảng Order, OrderItem</p>
+          <h1 className="text-2xl font-bold text-gray-800">Cổng tiếp nhận Yêu cầu Thiết kế</h1>
+          <p className="text-gray-500 text-sm mt-1">Danh sách yêu cầu thiết kế từ hệ thống Mainflow 2</p>
         </div>
         <Link
           to="/staff/dashboard"
@@ -150,37 +105,37 @@ const StaffCustomOrdersList = () => {
         <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-500 text-sm">Tổng đơn</p>
+              <p className="text-gray-500 text-sm">Hiển thị</p>
               <p className="text-2xl font-bold text-gray-800">{stats.total}</p>
             </div>
-            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-2xl">📊</div>
+            <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center text-2xl">📊</div>
           </div>
         </div>
         <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-500 text-sm">PENDING</p>
-              <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
+              <p className="text-gray-500 text-sm">Chờ tiếp nhận</p>
+              <p className="text-2xl font-bold text-blue-600">{stats.submitted}</p>
             </div>
-            <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center text-2xl">⏳</div>
+            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-2xl">📥</div>
           </div>
         </div>
         <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-500 text-sm">PROCESSING</p>
-              <p className="text-2xl font-bold text-blue-600">{stats.processing}</p>
+              <p className="text-gray-500 text-sm">Đang phụ trách</p>
+              <p className="text-2xl font-bold text-yellow-600">{stats.assigned}</p>
             </div>
-            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-2xl">⚙️</div>
+            <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center text-2xl">👤</div>
           </div>
         </div>
         <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-500 text-sm">PRINTING</p>
-              <p className="text-2xl font-bold text-orange-600">{stats.printing}</p>
+              <p className="text-gray-500 text-sm">Chờ khách duyệt</p>
+              <p className="text-2xl font-bold text-purple-600">{stats.quoted}</p>
             </div>
-            <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-2xl">🖨️</div>
+            <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center text-2xl">💰</div>
           </div>
         </div>
       </div>
@@ -194,47 +149,28 @@ const StaffCustomOrdersList = () => {
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
               <input
                 type="text"
-                placeholder="Tìm theo Order ID, tên khách..."
+                placeholder="Tìm theo ID, tiêu đề..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-800 placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-800 placeholder-gray-400 focus:outline-none focus:border-indigo-500"
               />
             </div>
           </div>
 
-          {/* OrderStatus Filter */}
+          {/* Status Filter */}
           <div className="flex items-center gap-2">
-            <span className="text-gray-500 text-sm">OrderStatus:</span>
-            <div className="flex gap-1">
-              {['all', 'PENDING', 'PROCESSING', 'PRINTING', 'COMPLETED'].map(status => (
+            <span className="text-gray-500 text-sm">Trạng thái:</span>
+            <div className="flex flex-wrap gap-1">
+              {['all', 'SUBMITTED', 'ASSIGNED', 'QUOTED', 'NEGOTIATING', 'APPROVED'].map(status => (
                 <button
                   key={status}
                   onClick={() => setFilter(status)}
                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${filter === status
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-indigo-600 text-white'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                 >
-                  {status === 'all' ? 'Tất cả' : orderStatusConfig[status]?.label || status}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* SourceType Filter */}
-          <div className="flex items-center gap-2">
-            <span className="text-gray-500 text-sm">SourceType:</span>
-            <div className="flex gap-1">
-              {['all', 'PREMADE', 'CUSTOMER_FILE', 'DESIGN_WORK', 'AI_GENERATE'].map(type => (
-                <button
-                  key={type}
-                  onClick={() => setSourceTypeFilter(type)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${sourceTypeFilter === type
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                >
-                  {type === 'all' ? 'Tất cả' : sourceTypeConfig[type]?.icon}
+                  {status === 'all' ? 'Tất cả' : STATUS_CONFIG[status]?.label || status}
                 </button>
               ))}
             </div>
@@ -247,86 +183,77 @@ const StaffCustomOrdersList = () => {
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Order ID</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Customer</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Items</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">SourceTypes</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">TotalPrice</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Priority</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">OrderStatus</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">CreatedAt</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Actions</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Mã yêu cầu</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Tiêu đề</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Mức giá gần nhất</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Ngày tạo</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Trạng thái</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {filteredOrders.length === 0 ? (
+            {loading ? (
               <tr>
-                <td colSpan="9" className="px-6 py-12 text-center text-gray-400">
+                <td colSpan="6" className="px-6 py-12 text-center">
+                  <Spin size="large" />
+                </td>
+              </tr>
+            ) : filteredRequests.length === 0 ? (
+              <tr>
+                <td colSpan="6" className="px-6 py-12 text-center text-gray-400">
                   <div className="text-4xl mb-2">📭</div>
-                  <p>Không tìm thấy đơn hàng</p>
+                  <p>Không tìm thấy yêu cầu thiết kế</p>
                 </td>
               </tr>
             ) : (
-              filteredOrders.map(order => (
-                <tr key={order.id} className="hover:bg-gray-50">
+              filteredRequests.map(req => (
+                <tr key={req.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
-                    <span className="font-mono font-medium text-gray-800">{order.id}</span>
+                    <span className="font-mono font-medium text-gray-800" title={req.id}>{req.id.split('-')[0]}...</span>
                   </td>
                   <td className="px-4 py-3">
-                    <div>
-                      <p className="text-gray-800 font-medium">{order.customerName}</p>
-                      <p className="text-gray-400 text-xs">{order.customerPhone}</p>
-                    </div>
+                    <p className="text-gray-800 font-medium max-w-[200px] truncate" title={req.title}>{req.title || 'Không có tiêu đề'}</p>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="px-2 py-1 bg-gray-100 rounded text-gray-700 text-sm font-medium">{order.itemCount}</span>
+                    <span className="text-gray-800 font-medium">
+                      {req.latestQuotedPrice != null ? `${req.latestQuotedPrice.toLocaleString()} ₫` : 'Chưa báo giá'}
+                    </span>
+                    {req.quoteRevision > 0 && <span className="ml-2 text-xs text-gray-400">(v{req.quoteRevision})</span>}
+                  </td>
+                  <td className="px-4 py-3 text-gray-500 text-sm">
+                    {new Date(req.created).toLocaleString('vi-VN')}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex gap-1">
-                      {[...new Set(order.items.map(i => i.sourceType))].map(type => (
-                        <span key={type} className="text-lg" title={sourceTypeConfig[type]?.label}>
-                          {sourceTypeConfig[type]?.icon}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="text-green-600 font-medium">{order.totalPrice.toLocaleString()}đ</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${order.priority === 3 ? 'bg-red-100 text-red-700' :
-                      order.priority === 2 ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-gray-100 text-gray-600'
-                      }`}>
-                      P{order.priority}
+                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${STATUS_CONFIG[req.status]?.color}`}>
+                      {STATUS_CONFIG[req.status]?.icon} {STATUS_CONFIG[req.status]?.label}
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${orderStatusConfig[order.orderStatus]?.color}`}>
-                      {orderStatusConfig[order.orderStatus]?.icon} {orderStatusConfig[order.orderStatus]?.label}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 text-sm">{order.createdAt}</td>
-                  <td className="px-4 py-3">
-                    <Link
-                      to={`/staff/custom-orders/${order.id}`}
-                      className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
-                    >
-                      Chi tiết
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      {req.status === 'SUBMITTED' ? (
+                        <button
+                          onClick={() => handleAssign(req.id)}
+                          disabled={assigningId === req.id}
+                          className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:bg-gray-400"
+                        >
+                          {assigningId === req.id ? 'Đang nhận...' : 'Nhận việc'}
+                        </button>
+                      ) : null}
+                      
+                      {/* For assigning or interacting, go to Detail page */}
+                      <Link
+                        to={`/staff/custom-orders/${req.id}`}
+                        className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                      >
+                        Chi tiết
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
-      </div>
-
-      {/* Info */}
-      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-        <p className="text-blue-700 text-sm">
-          💡 <strong>DB Tables:</strong> Order (OrderStatus, Priority, TotalPrice) → OrderItem (SourceType, FulfillmentStatus) → Customer → Account
-        </p>
       </div>
     </div>
   );

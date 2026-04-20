@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import '@google/model-viewer';
 
@@ -14,6 +14,7 @@ import glbModel3 from '../components/imgs/glb/model3.glb';
 import glbModel4 from '../components/imgs/glb/model4.glb';
 import glbModel5 from '../components/imgs/glb/model5.glb';
 import glbModel6 from '../components/imgs/glb/model6.glb';
+import conceptTagApi from '../api/conceptTagApi';
 
 const categories = [
   'Mô hình trang trí',
@@ -49,6 +50,8 @@ const SUGGESTED_PRODUCTS = [
 // ─── INTERACTIVE 3D CARD (Hover → xem model-viewer)
 const Interactive3DCard = ({ title, modelSrc, to }) => {
   const [isHovered, setIsHovered] = useState(false);
+
+
 
   return (
     <Link
@@ -190,6 +193,20 @@ const UserIcon = () => (
 );
 
 const Home = () => {
+  const [listTag, setListTag] = useState([])
+
+  const fetch = async () => {
+    console.log('useeffect run');
+    const response = await conceptTagApi.getAll();
+    console.log(response);
+    setListTag(response.data);
+  }
+
+  // dependencies array:
+  // []: array trống( nếu để như này là chạy 1 lần duy nhất khi loadpage)
+  useEffect(() => {
+    fetch()
+  }, [])
   return (
     <div className="space-y-10">
       {/* ─── Hero Section */}
@@ -298,12 +315,12 @@ const Home = () => {
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 lg:gap-5">
-          {CATEGORY_CARDS.map((card) => (
+          {listTag.map((card) => (
             <Interactive3DCard
-              key={card.category}
-              title={card.title}
+              key={card.id}
+              title={card.name}
               modelSrc={card.modelSrc}
-              to={`/products?category=${encodeURIComponent(card.category)}`}
+              to={`/products?category=${card.id}`}
             />
           ))}
         </div>

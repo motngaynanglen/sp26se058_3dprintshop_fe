@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Layout as AntLayout } from 'antd';
+import { Layout as AntLayout, message } from 'antd';
 import { useAuth } from '../../contexts/AuthContext';
 
 const { Sider, Content } = AntLayout;
@@ -12,7 +12,8 @@ const ManagerLayout = ({ children }) => {
 
   const handleLogout = () => {
     logout();
-    navigate('/');
+    message.success('Đã đăng xuất khỏi trang quản lý!');
+    navigate('/admin/login');
   };
 
   const menuItems = [
@@ -64,7 +65,6 @@ const ManagerLayout = ({ children }) => {
         width={250}
         theme="light"
         style={{
-          overflow: 'auto',
           height: '100vh',
           position: 'fixed',
           left: 0,
@@ -74,13 +74,15 @@ const ManagerLayout = ({ children }) => {
           zIndex: 1000
         }}
       >
-        <div className="p-6 border-b border-gray-200">
-          <Link to="/" className="no-underline">
-            <h1 className="text-xl font-bold text-gray-800">3D Print Shop</h1>
-            <p className="text-sm text-gray-600 mt-1">Trang Quản Lý</p>
-          </Link>
-        </div>
-        <nav className="p-4">
+        <div className="flex flex-col h-full w-full overflow-hidden">
+          <div className="p-6 border-b border-gray-200 shrink-0">
+            <Link to="/" className="no-underline">
+              <h1 className="text-xl font-bold text-gray-800">3D Print Shop</h1>
+              <p className="text-sm text-gray-600 mt-1">Trang Quản Lý</p>
+            </Link>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            <nav className="p-4">
           {menuItems.map((item) => {
             const isActive = location.pathname === item.path;
             return (
@@ -97,8 +99,9 @@ const ManagerLayout = ({ children }) => {
               </Link>
             );
           })}
-        </nav>
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-white">
+            </nav>
+          </div>
+          <div className="shrink-0 p-4 border-t border-gray-200 bg-white">
           <div className="mb-3 px-4">
             <p className="text-sm font-medium text-gray-800">{user?.fullName || user?.username}</p>
             <p className="text-xs text-gray-600 capitalize">{user?.role}</p>
@@ -108,7 +111,8 @@ const ManagerLayout = ({ children }) => {
             className="w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 rounded-lg transition-colors font-medium"
           >
             Đăng xuất
-          </button>
+            </button>
+          </div>
         </div>
       </Sider>
       <AntLayout style={{ marginLeft: 250, minHeight: '100vh', background: '#f5f5f5' }}>
