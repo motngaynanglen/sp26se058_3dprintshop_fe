@@ -4,6 +4,7 @@ import { Breadcrumb, Spin, notification, Modal } from 'antd';
 import { getOrderDetailApi } from '../api/orderApi';
 import { getShipmentByOrderApi } from '../api/shipmentApi';
 import transactionApi from '../api/transactionApi';
+import { buildCustomerTrackingSteps, resolveCustomerOrderDisplayStatus } from '../utils/orderNormalize';
 
 // ... (keep previous icons and configs)
 
@@ -82,21 +83,24 @@ const FULFILLMENT_CONFIG = {
   failed: { label: 'Thất bại', className: 'bg-red-50 text-red-600' },
 };
 
-// ─── ORDER STATUS BADGES (cấp Order)
+// ─── ORDER STATUS BADGES (cấp Order) — đồng bộ BE: PENDING / PROCESSING / FINISHED / COMPLETED
 const ORDER_STATUS_CONFIG = {
+  PENDING: { label: 'Chờ thanh toán', className: 'bg-gray-100 text-gray-600 ring-1 ring-gray-200' },
   CREATED: { label: 'Chờ thanh toán', className: 'bg-gray-100 text-gray-600 ring-1 ring-gray-200' },
   PAID: { label: 'Đã thanh toán', className: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200' },
   CONFIRMED: { label: 'Đã xác nhận', className: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200' },
   PROCESSING: { label: 'Đang xử lý', className: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200' },
+  FINISHED: { label: 'Chờ giao hàng', className: 'bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200' },
   SHIPPING: { label: 'Đang vận chuyển', className: 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200' },
   COMPLETED: { label: 'Hoàn thành', className: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' },
   CANCELLED: { label: 'Đã hủy', className: 'bg-red-50 text-red-700 ring-1 ring-red-200' },
   FAILED: { label: 'Thất bại', className: 'bg-red-50 text-red-700 ring-1 ring-red-200' },
-  // lowercase fallback
+  pending: { label: 'Chờ thanh toán', className: 'bg-gray-100 text-gray-600 ring-1 ring-gray-200' },
   created: { label: 'Chờ thanh toán', className: 'bg-gray-100 text-gray-600 ring-1 ring-gray-200' },
   paid: { label: 'Đã thanh toán', className: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200' },
   confirmed: { label: 'Đã xác nhận', className: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200' },
   processing: { label: 'Đang xử lý', className: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200' },
+  finished: { label: 'Chờ giao hàng', className: 'bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200' },
   shipping: { label: 'Đang vận chuyển', className: 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200' },
   completed: { label: 'Hoàn thành', className: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' },
   cancelled: { label: 'Đã hủy', className: 'bg-red-50 text-red-700 ring-1 ring-red-200' },
@@ -122,96 +126,13 @@ const FulfillmentBadge = ({ status }) => {
   );
 };
 
-const OrderStatusBadge = ({ status }) => {
-  const config = ORDER_STATUS_CONFIG[status] || ORDER_STATUS_CONFIG.CREATED;
+const OrderStatusBadge = ({ status, label }) => {
+  const config = ORDER_STATUS_CONFIG[status] || ORDER_STATUS_CONFIG.PENDING;
   return (
     <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${config.className}`}>
-      {config.label}
+      {label || config.label}
     </span>
   );
-};
-
-// ─── TIMELINE: mapping OrderStatus → tracking steps
-const buildTrackingSteps = (orderStatus, hasPreOrder) => {
-  const s = (orderStatus || '').toUpperCase();
-  const isFailed = s === 'FAILED' || s === 'CANCELLED';
-
-  if (isFailed) {
-    return [{
-      key: 'failed',
-      label: s === 'CANCELLED' ? 'Đơn hàng đã hủy' : 'Đơn hàng thất bại',
-      description: s === 'CANCELLED' ? 'Đơn hàng đã bị hủy.' : 'Thanh toán không thành công hoặc đơn hàng bị huỷ.',
-      done: true,
-      isFailed: true,
-    }];
-  }
-
-  const doneSet = new Set();
-  const statusOrder = ['CREATED', 'PAID', 'CONFIRMED', 'PROCESSING', 'SHIPPING', 'COMPLETED'];
-  // Chỉ đánh dấu done cho các bước đã qua — nếu status không nằm trong danh sách thì chỉ mark CREATED
-  const currentIndex = statusOrder.indexOf(s);
-  if (currentIndex >= 0) {
-    for (let i = 0; i <= currentIndex; i++) {
-      doneSet.add(statusOrder[i]);
-    }
-  } else {
-    // PENDING hoặc status chưa biết → chỉ CREATED (đã đặt hàng)
-    doneSet.add('CREATED');
-  }
-
-  const steps = [
-    {
-      key: 'created',
-      label: 'Đã đặt hàng',
-      description: 'Đơn hàng đã được tiếp nhận.',
-      done: doneSet.has('CREATED'),
-    },
-    {
-      key: 'paid',
-      label: 'Đã thanh toán',
-      description: 'Thanh toán đã được xác nhận.',
-      done: doneSet.has('PAID'),
-    },
-    {
-      key: 'confirmed',
-      label: 'Đã xác nhận',
-      description: 'Staff xác nhận đơn hàng.',
-      done: doneSet.has('CONFIRMED'),
-    },
-  ];
-
-  if (hasPreOrder) {
-    steps.push({
-      key: 'producing',
-      label: 'Đang sản xuất (Pre-Order)',
-      description: 'Hàng đang được sản xuất theo đơn đặt trước.',
-      done: doneSet.has('PROCESSING'),
-      isPreOrder: true,
-    });
-  }
-
-  steps.push(
-    {
-      key: 'processing',
-      label: 'Đang chuẩn bị hàng',
-      description: 'Đơn hàng đang được đóng gói và chuẩn bị giao.',
-      done: doneSet.has('PROCESSING'),
-    },
-    {
-      key: 'shipping',
-      label: 'Đang vận chuyển',
-      description: 'Đơn hàng đã được bàn giao cho đơn vị vận chuyển.',
-      done: doneSet.has('SHIPPING'),
-    },
-    {
-      key: 'completed',
-      label: 'Đã giao hàng',
-      description: 'Tất cả sản phẩm đã được giao thành công.',
-      done: doneSet.has('COMPLETED'),
-    }
-  );
-
-  return steps;
 };
 
 const formatDate = (dateStr) => {
@@ -336,23 +257,35 @@ const OrderDetail = () => {
     );
   }
 
-  // Normalize data — backend có thể trả field names khác nhau
-  const orderStatus = order.status || order.orderStatus || 'CREATED';
+  // Normalize data — backend: PENDING / PROCESSING / FINISHED / COMPLETED + invoice / shipment
+  const orderStatus = order.orderStatus || order.status || 'PENDING';
   const orderItems = order.items || order.orderItems || [];
   const orderNote = order.note || '';
   const orderCode = order.code || order.orderCode || id;
   const createdDate = order.createdAt || order.created || order.date || '';
-  const shippingAddress = order.shippingAddress || order.shippingInfo || {};
-  const totalAmount = order.totalAmount || order.total || 0;
-  const subTotal = order.subTotal || order.subtotal || 0;
-  const shippingFee = order.shippingFee || order.shipping || 0;
-  const taxAmount = order.tax || order.taxAmount || 0;
+  const orderShipment = order.shipment || shipment || {};
+  const shippingAddress = order.shippingAddress || orderShipment.shippingAddress || (
+    orderShipment.fullAddress
+      ? { fullAddress: orderShipment.fullAddress }
+      : {}
+  );
+  const invoice = order.invoice || null;
+  const isInvoicePaid = (invoice?.paymentStatus || '').toUpperCase() === 'PAID';
+  const totalAmount = order.totalPrice ?? order.totalAmount ?? order.total ?? invoice?.totalAmount ?? 0;
+  const shippingFee = orderShipment.shippingFee ?? order.shippingFee ?? 0;
+  const subTotal = order.subTotal ?? order.subtotal ?? Math.max(0, totalAmount - shippingFee);
+  const taxAmount = order.tax ?? order.taxAmount ?? 0;
   const sourceType = order.sourceType || '';
+  const shipmentStatus = orderShipment.shipmentStatus || shipment?.shipmentStatus || '';
 
   const hasPreOrder = sourceType.toUpperCase() === 'PRE_ORDER' || orderItems.some(i => (i.sourceType || '').toUpperCase() === 'PRE_ORDER');
   const hasCustom = orderItems.some(i => (i.sourceType || '').toUpperCase().includes('SERVICE'));
   const isFailed = orderStatus.toUpperCase() === 'FAILED' || orderStatus.toUpperCase() === 'CANCELLED';
-  const trackingSteps = buildTrackingSteps(orderStatus, hasPreOrder);
+  const displayStatus = resolveCustomerOrderDisplayStatus(orderStatus, shipmentStatus, isInvoicePaid, orderItems);
+  const trackingSteps = buildCustomerTrackingSteps(orderStatus, shipmentStatus, isInvoicePaid, orderItems);
+  const txStatus = (transaction?.transactionStatus || transaction?.status || '').toUpperCase();
+  const txMethod = transaction?.paymentMethod || transaction?.method || '';
+  const txAmount = transaction?.amount ?? transaction?.totalAmount ?? invoice?.totalAmount ?? totalAmount;
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">
@@ -375,7 +308,7 @@ const OrderDetail = () => {
             {createdDate && <> · Đặt ngày {formatDate(createdDate)}</>}
           </p>
         </div>
-        <OrderStatusBadge status={orderStatus} />
+        <OrderStatusBadge status={displayStatus.key} label={displayStatus.label} />
       </div>
 
       {/* Failed banner */}
@@ -435,7 +368,7 @@ const OrderDetail = () => {
                 {orderItems.map((item, idx) => {
                   const itemName = item.name || item.designVariantName || item.variantName || `Sản phẩm #${idx + 1}`;
                   const itemPrice = item.unitPrice || item.price || 0;
-                  const itemQty = item.quantity || 1;
+                  const itemQty = item.quantityOrdered ?? item.quantity ?? 1;
                   const itemImg = item.image || item.thumbnailUrl || item.imageUrl || null;
                   const itemSourceType = item.sourceType || sourceType || 'IN_STOCK';
                   const itemFulfillment = item.fulfillmentStatus || item.status || 'PENDING';
@@ -482,27 +415,35 @@ const OrderDetail = () => {
               <h2 className="text-lg font-bold text-gray-900">Theo dõi đơn hàng</h2>
             </div>
             <div className="space-y-0">
-              {trackingSteps.map((step, idx) => (
+              {trackingSteps.map((step, idx) => {
+                const stepComplete = step.done && !step.isCurrent;
+                return (
                 <div key={step.key} className="flex gap-4">
                   <div className="flex flex-col items-center">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                       step.isFailed
                         ? 'bg-red-500 text-white'
-                        : step.done
-                          ? step.isPreOrder ? 'bg-amber-500 text-white' : 'bg-indigo-600 text-white'
-                          : 'bg-gray-100 text-gray-300'
+                        : step.isCurrent
+                          ? 'bg-indigo-600 text-white ring-4 ring-indigo-100'
+                          : stepComplete
+                            ? step.isPreOrder ? 'bg-amber-500 text-white' : 'bg-indigo-600 text-white'
+                            : 'bg-gray-100 text-gray-300'
                     }`}>
-                      {step.isFailed ? <XCircleIcon /> : step.done ? <CheckCircleSolidIcon /> : (
+                      {step.isFailed ? <XCircleIcon /> : stepComplete ? <CheckCircleSolidIcon /> : step.isCurrent ? (
+                        <div className="w-2.5 h-2.5 rounded-full bg-white" />
+                      ) : (
                         <div className="w-2.5 h-2.5 rounded-full bg-gray-300" />
                       )}
                     </div>
                     {idx < trackingSteps.length - 1 && (
-                      <div className={`w-0.5 h-12 ${step.done ? (step.isPreOrder ? 'bg-amber-200' : 'bg-indigo-200') : 'bg-gray-100'}`} />
+                      <div className={`w-0.5 h-12 ${stepComplete ? (step.isPreOrder ? 'bg-amber-200' : 'bg-indigo-200') : 'bg-gray-100'}`} />
                     )}
                   </div>
                   <div className="flex-1 pb-6">
                     <div className="flex items-center gap-2">
-                      <p className={`font-semibold text-sm ${step.done ? 'text-gray-900' : 'text-gray-400'}`}>
+                      <p className={`font-semibold text-sm ${
+                        step.isCurrent ? 'text-indigo-700' : stepComplete || step.done ? 'text-gray-900' : 'text-gray-400'
+                      }`}>
                         {step.label}
                       </p>
                       {step.isPreOrder && (
@@ -511,13 +452,18 @@ const OrderDetail = () => {
                           Pre-Order
                         </span>
                       )}
+                      {step.isCurrent && (
+                        <span className="text-[10px] font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                          Hiện tại
+                        </span>
+                      )}
                     </div>
-                    <p className={`text-xs mt-0.5 ${step.done ? 'text-gray-500' : 'text-gray-400'}`}>
+                    <p className={`text-xs mt-0.5 ${step.isCurrent || stepComplete ? 'text-gray-500' : 'text-gray-400'}`}>
                       {step.description}
                     </p>
                   </div>
                 </div>
-              ))}
+              );})}
             </div>
           </div>
 
@@ -618,21 +564,29 @@ const OrderDetail = () => {
             </div>
 
             {/* Shipping address */}
-            {shippingAddress && (shippingAddress.receiverName || shippingAddress.name) && (
+            {shippingAddress && (shippingAddress.receiverName || shippingAddress.name || shippingAddress.fullAddress) && (
               <div className="pt-4 border-t border-gray-100">
                 <div className="flex items-center gap-1.5 mb-3">
                   <MapPinIcon />
                   <h3 className="font-bold text-gray-900 text-sm">Địa chỉ giao hàng</h3>
                 </div>
                 <div className="text-sm text-gray-600 space-y-0.5">
-                  <p className="font-medium text-gray-800">{shippingAddress.receiverName || shippingAddress.name}</p>
-                  <p>{[shippingAddress.addressLine, shippingAddress.address].filter(Boolean).join('')}</p>
-                  <p>
-                    {[shippingAddress.ward, shippingAddress.district, shippingAddress.city, shippingAddress.province]
-                      .filter(Boolean)
-                      .join(', ')}
-                  </p>
-                  <p>{shippingAddress.phone}</p>
+                  {(shippingAddress.receiverName || shippingAddress.name) && (
+                    <p className="font-medium text-gray-800">{shippingAddress.receiverName || shippingAddress.name}</p>
+                  )}
+                  {shippingAddress.fullAddress ? (
+                    <p>{shippingAddress.fullAddress}</p>
+                  ) : (
+                    <>
+                      <p>{[shippingAddress.addressLine, shippingAddress.address].filter(Boolean).join('')}</p>
+                      <p>
+                        {[shippingAddress.ward, shippingAddress.district, shippingAddress.city, shippingAddress.province]
+                          .filter(Boolean)
+                          .join(', ')}
+                      </p>
+                    </>
+                  )}
+                  {shippingAddress.phone && <p>{shippingAddress.phone}</p>}
                 </div>
               </div>
             )}
@@ -645,39 +599,44 @@ const OrderDetail = () => {
                 </svg>
                 <h3 className="font-bold text-gray-900 text-sm">Thanh toán</h3>
               </div>
-              {transaction ? (
+              {transaction || invoice ? (
                 <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Phương thức</span>
-                    <span className="font-medium text-gray-800">
-                      {(transaction.paymentMethod || transaction.method || '').toUpperCase() === 'PAYOS' ? 'PayOS' : (transaction.paymentMethod || transaction.method || '').toUpperCase() === 'CASH' ? 'Tiền mặt (COD)' : (transaction.paymentMethod || transaction.method || '—')}
-                    </span>
-                  </div>
+                  {(txMethod || invoice) && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Phương thức</span>
+                      <span className="font-medium text-gray-800">
+                        {txMethod.toUpperCase() === 'PAYOS' ? 'PayOS'
+                          : txMethod.toUpperCase() === 'VNPAY' ? 'VNPay'
+                          : txMethod.toUpperCase() === 'CASH' ? 'Tiền mặt (COD)'
+                          : txMethod || '—'}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-gray-500">Trạng thái</span>
                     <span className={`font-medium text-xs px-2 py-0.5 rounded-full ${
-                      (transaction.status || '').toUpperCase() === 'PAID' || (transaction.status || '').toUpperCase() === 'SUCCESS'
+                      isInvoicePaid || txStatus === 'PAID' || txStatus === 'SUCCESS'
                         ? 'bg-emerald-50 text-emerald-700'
-                        : (transaction.status || '').toUpperCase() === 'PENDING'
+                        : txStatus === 'PENDING' || (invoice && !isInvoicePaid)
                         ? 'bg-amber-50 text-amber-700'
-                        : (transaction.status || '').toUpperCase() === 'CANCELLED' || (transaction.status || '').toUpperCase() === 'FAILED'
+                        : txStatus === 'CANCELLED' || txStatus === 'FAILED'
                         ? 'bg-red-50 text-red-700'
                         : 'bg-gray-100 text-gray-600'
                     }`}>
-                      {(transaction.status || '').toUpperCase() === 'PAID' || (transaction.status || '').toUpperCase() === 'SUCCESS' ? 'Đã thanh toán'
-                        : (transaction.status || '').toUpperCase() === 'PENDING' ? 'Chờ thanh toán'
-                        : (transaction.status || '').toUpperCase() === 'CANCELLED' ? 'Đã hủy'
-                        : (transaction.status || '').toUpperCase() === 'FAILED' ? 'Thất bại'
-                        : (transaction.status || '—')}
+                      {isInvoicePaid || txStatus === 'PAID' || txStatus === 'SUCCESS' ? 'Đã thanh toán'
+                        : txStatus === 'PENDING' || (invoice && !isInvoicePaid) ? 'Chờ thanh toán'
+                        : txStatus === 'CANCELLED' ? 'Đã hủy'
+                        : txStatus === 'FAILED' ? 'Thất bại'
+                        : invoice?.paymentStatus || '—'}
                     </span>
                   </div>
-                  {(transaction.amount || transaction.totalAmount) > 0 && (
+                  {txAmount > 0 && (
                     <div className="flex justify-between">
                       <span className="text-gray-500">Số tiền</span>
-                      <span className="font-medium text-gray-800">{formatPrice(transaction.amount || transaction.totalAmount)}</span>
+                      <span className="font-medium text-gray-800">{formatPrice(txAmount)}</span>
                     </div>
                   )}
-                  {transaction.paidAt && (
+                  {transaction?.paidAt && (
                     <div className="flex justify-between">
                       <span className="text-gray-500">Thanh toán lúc</span>
                       <span className="text-gray-700 text-xs">{formatDate(transaction.paidAt)}</span>
@@ -706,7 +665,7 @@ const OrderDetail = () => {
             )}
 
             {/* Thanh toán ngay — chỉ hiện khi chưa thanh toán */}
-            {(orderStatus.toUpperCase() === 'CREATED' || orderStatus.toUpperCase() === 'PENDING') && (
+            {!isInvoicePaid && orderStatus.toUpperCase() === 'PENDING' && (
               <div className="pt-4 border-t border-gray-100 space-y-2">
                 <button
                   onClick={() => handlePayNow('PAYOS')}

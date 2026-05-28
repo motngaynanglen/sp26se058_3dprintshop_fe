@@ -1,70 +1,106 @@
-import React, { useState, useEffect } from 'react';
-import { Modal } from 'antd';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Modal, Form, Input, Button, App } from 'antd';
+import { UserOutlined, LockOutlined, MailOutlined, PhoneOutlined } from '@ant-design/icons';
 import { useAuthModal } from '../../contexts/AuthModalContext';
-
-// Import 2 Lõi Component chúng ta vừa tách ra
-// (Hãy chỉnh lại đường dẫn './' cho đúng với cấu trúc thư mục của bạn nhé)
-import LoginForm from './LoginForm';
-import RegisterForm from './RegisterForm';
+import { useAuth } from '../../contexts/AuthContext';
+import { getPostLoginPath } from '../../utils/authRedirect';
 
 const AuthModal = () => {
-  const { isOpen, mode: contextMode, closeModal } = useAuthModal();
-  const [mode, setMode] = useState('login');
+  const { open, mode, setMode, closeModal } = useAuthModal();
+  const { login, register } = useAuth();
+  const navigate = useNavigate();
+  const { message } = App.useApp();
+  const [loading, setLoading] = useState(false);
+  const [form] = Form.useForm();
 
-  // Lắng nghe sự thay đổi mode từ Context (khi ai đó bấm nút mở Modal ở chỗ khác)
-  useEffect(() => {
-    if (contextMode) setMode(contextMode);
-  }, [contextMode]);
+  const isLogin = mode === 'login';
 
-  // Đóng Modal (Không cần dọn dẹp state nữa vì state nằm trong Form con, đóng Modal là form con tự reset)
   const handleClose = () => {
+    form.resetFields();
     closeModal();
+  };
+
+  const onFinish = async (values) => {
+    setLoading(true);
+    try {
+      if (isLogin) {
+        const result = await login(values.username, values.password);
+        if (result.success) {
+          message.success('Đăng nhập thành công');
+          handleClose();
+          navigate(getPostLoginPath(result.user?.role));
+        } else {
+          message.error(result.message || 'Đăng nhập thất bại');
+        }
+      } else {
+        const result = await register({
+          username: values.username,
+          password: values.password,
+          fullName: values.fullName,
+          email: values.email,
+          contactPhone: values.contactPhone,
+        });
+        if (result.success) {
+          message.success('Đăng ký thành công — vui lòng đăng nhập');
+          setMode('login');
+          form.resetFields();
+        } else {
+          message.error(result.message || 'Đăng ký thất bại');
+        }
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <Modal
-      open={isOpen}
+      title={isLogin ? 'Đăng nhập' : 'Đăng ký tài khoản'}
+      open={open}
       onCancel={handleClose}
       footer={null}
-      width={500}
-      centered
-      className="auth-modal"
-      destroyOnClose // Thêm cờ này để React xóa sạch dữ liệu form cũ khi Modal đóng lại
+      destroyOnClose
+      width={420}
     >
-      <div className="p-6">
-        <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center uppercase">
-          {mode === 'login' ? 'Đăng nhập' : 'Tạo tài khoản'}
-        </h2>
-
-        {mode === 'login' ? (
+      <Form form={form} layout="vertical" onFinish={onFinish} size="large">
+        {!isLogin && (
           <>
-            {/* Truyền hàm đóng Modal vào để đăng nhập xong tự biến mất */}
-            <LoginForm onSuccess={handleClose} />
-
-            <p className="mt-6 text-center text-sm text-gray-600">
-              Chưa có tài khoản?{' '}
-              <span
-                className="text-indigo-600 font-bold cursor-pointer hover:underline"
-                onClick={() => setMode('register')}
-              >
-                Đăng ký ngay
-              </span>
-            </p>
+            <Form.Item name="fullName" label="Họ tên" rules={[{ required: true, message: 'Nhập họ tên' }]}>
+              <Input prefix={<UserOutlined />} placeholder="Họ và tên" />
+            </Form.Item>
+            <Form.Item name="email" label="Email" rules={[{ required: true, type: 'email', message: 'Email không hợp lệ' }]}>
+              <Input prefix={<MailOutlined />} placeholder="email@example.com" />
+            </Form.Item>
+            <Form.Item name="contactPhone" label="Số điện thoại" rules={[{ required: true, message: 'Nhập SĐT' }]}>
+              <Input prefix={<PhoneOutlined />} placeholder="09xxxxxxxx" />
+            </Form.Item>
+          </>
+        )}
+        <Form.Item name="username" label="Tên đăng nhập" rules={[{ required: true, message: 'Nhập tên đăng nhập' }]}>
+          <Input prefix={<UserOutlined />} placeholder="username" autoComplete="username" />
+        </Form.Item>
+        <Form.Item name="password" label="Mật khẩu" rules={[{ required: true, message: 'Nhập mật khẩu' }]}>
+          <Input.Password prefix={<LockOutlined />} placeholder="••••••••" autoComplete={isLogin ? 'current-password' : 'new-password'} />
+        </Form.Item>
+        <Button type="primary" htmlType="submit" loading={loading} block className="mt-2">
+          {isLogin ? 'Đăng nhập' : 'Đăng ký'}
+        </Button>
+      </Form>
+      <div className="text-center mt-4 text-sm text-gray-500">
+        {isLogin ? (
+          <>
+            Chưa có tài khoản?{' '}
+            <button type="button" className="text-indigo-600 font-medium cursor-pointer bg-transparent border-0" onClick={() => setMode('register')}>
+              Đăng ký ngay
+            </button>
           </>
         ) : (
           <>
-            {/* Truyền hàm đổi mode để đăng ký xong thì tự nhảy sang form Đăng nhập */}
-            <RegisterForm onSuccess={() => setMode('login')} />
-
-            <p className="mt-6 text-center text-sm text-gray-600">
-              Đã có tài khoản?{' '}
-              <span
-                className="text-indigo-600 font-bold cursor-pointer hover:underline"
-                onClick={() => setMode('login')}
-              >
-                Đăng nhập
-              </span>
-            </p>
+            Đã có tài khoản?{' '}
+            <button type="button" className="text-indigo-600 font-medium cursor-pointer bg-transparent border-0" onClick={() => setMode('login')}>
+              Đăng nhập
+            </button>
           </>
         )}
       </div>

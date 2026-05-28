@@ -1,8 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from '../components/Layout/Layout';
-import ManagerLayout from '../components/Layout/ManagerLayout';
-import DashboardLayout from '../components/Layout/DashboardLayout';
 import PrivateRoute from './PrivateRoute';
 import PublicRoute from './PublicRoute';
 import { useAuthModal } from '../contexts/AuthModalContext';
@@ -31,8 +29,7 @@ import Preview3D from "../pages/Preview3D";
 import FeedbackForm from "../pages/FeedbackForm";
 import Design3DCustomizer from "../pages/Design3DCustomizer";
 
-// Dashboard Pages
-import DashboardOverview from "../pages/Dashboard/DashboardOverview";
+
 
 // Staff Pages
 import StaffDashboard from "../pages/Staff/StaffDashboard";
@@ -41,34 +38,15 @@ import StaffCustomOrderDetail from "../pages/Staff/StaffCustomOrderDetail";
 import DesignFileUpload from "../pages/Staff/DesignFileUpload";
 import StaffDesignReviewDetail from "../pages/Staff/StaffDesignReviewDetail";
 import StaffDesignReviewsList from "../pages/Staff/StaffDesignReviewsList";
-import StaffCustomOrderManagementDetail from "../pages/Staff/StaffCustomOrderManagementDetail";
-import StaffCustomOrdersManagement from "../pages/Staff/StaffCustomOrdersManagement";
 import StaffCustomItemPrinting from "../pages/Staff/StaffCustomItemPrinting";
 import StaffTemplateManagement from "../pages/Staff/StaffTemplateManagement";
 import StaffTemplateDetail from "../pages/Staff/StaffTemplateDetail";
 import StaffCreateProductionJob from "../pages/Staff/StaffCreateProductionJob";
+import StaffProductionQueue from "../pages/Staff/StaffProductionQueue";
+import StaffShopOrders from "../pages/Staff/StaffShopOrders";
+import StaffRoute from "../components/Layout/StaffRoute";
 
-// Admin Pages
-import AdminDashboard from "../pages/Manager/ManagerDashboard";
-import ManageProducts from "../pages/Manager/ManageProducts";
-import ManageMaterials from "../pages/Manager/ManageMaterials";
-import ManageDesignTemplates from "../pages/Manager/ManageDesignTemplates";
-import DesignTemplateEdit from "../pages/Manager/DesignTemplateEdit";
-import ManageStaffAccounts from "../pages/Manager/ManageStaffAccounts";
-import FeedbackList from "../pages/Manager/FeedbackList";
-import SystemSettings from "../pages/Manager/SystemSettings";
-import ManagerInvoices from "../pages/Manager/ManagerInvoices";
-import ManagerTransactions from "../pages/Manager/ManagerTransactions";
-import ManagerInvoiceDetail from "../pages/Manager/ManagerInvoiceDetail";
-import ManagerTransactionDetail from "../pages/Manager/ManagerTransactionDetail";
-import ManageInventory from "../pages/Manager/ManageInventory";
-import ManageOrders from "../pages/Manager/ManageOrders";
-import ManagerDashboard from '../pages/Manager/ManagerDashboard';
-
-// === IMPORT TỪ TỔNG ĐÀI ADMIN ===
-import { ManageUsers, AdminOrderList, AdminOrderDetail, AdminShipmentList, AdminInventory, AdminServices } from "../pages/Admin";
-
-// === IMPORT CỤM AUTH CHUẨN SENIOR ===
+// Auth Pages
 import {
   LoginPage,
   RegisterPage,
@@ -292,166 +270,32 @@ const AppRouter = () => {
         />
         <Route
           path="/manager/orders"
-          element={
-            <PrivateRoute requiredRole={['manager', 'admin']}>
-              <ManagerLayout>
-                <ManageOrders />
-              </ManagerLayout>
-            </PrivateRoute>
-          }
-        />
-
+        {/* CỤM ROUTES: STAFF (StaffLayout + JWT)      */}
         {/* ========================================== */}
-        {/* CỤM ROUTES: STAFF                          */}
-        {/* ========================================== */}
-        <Route
-          path="/staff/dashboard"
-          element={
-            <Layout>
-              <PrivateRoute requiredRole={['employee', 'staff']}>
-                <StaffDashboard />
-              </PrivateRoute>
-            </Layout>
-          }
-        />
-        <Route
-          path="/staff/custom-orders"
-          element={
-            <Layout>
-              <PrivateRoute requiredRole={['employee', 'staff']}>
-                <StaffCustomOrdersList />
-              </PrivateRoute>
-            </Layout>
-          }
-        />
-        <Route
-          path="/staff/custom-orders/:id"
-          element={
-            <Layout>
-              <PrivateRoute requiredRole={['employee', 'staff']}>
-                <StaffCustomOrderDetail />
-              </PrivateRoute>
-            </Layout>
-          }
-        />
+        <Route path="/staff" element={<Navigate to="/staff/dashboard" replace />} />
+        <Route path="/staff/dashboard" element={<StaffRoute><StaffDashboard /></StaffRoute>} />
+        <Route path="/staff/production-queue" element={<StaffRoute><StaffProductionQueue /></StaffRoute>} />
+        <Route path="/staff/shop-orders" element={<StaffRoute><StaffShopOrders /></StaffRoute>} />
+        <Route path="/staff/custom-orders" element={<StaffRoute><StaffCustomOrdersList /></StaffRoute>} />
+        <Route path="/staff/custom-orders/:id" element={<StaffRoute><StaffCustomOrderDetail /></StaffRoute>} />
         <Route
           path="/staff/custom-orders/:orderId/items/:itemId/printing"
-          element={
-            <Layout>
-              <PrivateRoute requiredRole={['employee', 'staff']}>
-                <StaffCustomItemPrinting />
-              </PrivateRoute>
-            </Layout>
-          }
+          element={<StaffRoute><StaffCustomItemPrinting /></StaffRoute>}
         />
         <Route
           path="/staff/custom-orders-management"
-          element={
-            <Layout>
-              <PrivateRoute requiredRole={['employee', 'staff']}>
-                <StaffCustomOrdersManagement />
-              </PrivateRoute>
-            </Layout>
-          }
+          element={<Navigate to="/staff/shop-orders" replace />}
         />
         <Route
           path="/staff/custom-orders-management/:id"
-          element={
-            <Layout>
-              <PrivateRoute requiredRole={['employee', 'staff']}>
-                <StaffCustomOrderManagementDetail />
-              </PrivateRoute>
-            </Layout>
-          }
+          element={<Navigate to="/staff/shop-orders" replace />}
         />
-        <Route
-          path="/staff/production-jobs/new"
-          element={
-            <Layout>
-              <PrivateRoute requiredRole={['employee', 'staff']}>
-                <StaffCreateProductionJob />
-              </PrivateRoute>
-            </Layout>
-          }
-        />
-        <Route
-          path="/staff/design-reviews"
-          element={
-            <Layout>
-              <PrivateRoute requiredRole={['employee', 'staff']}>
-                <StaffDesignReviewsList />
-              </PrivateRoute>
-            </Layout>
-          }
-        />
-        <Route
-          path="/staff/design-reviews/:id"
-          element={
-            <Layout>
-              <PrivateRoute requiredRole={['employee', 'staff']}>
-                <StaffDesignReviewDetail />
-              </PrivateRoute>
-            </Layout>
-          }
-        />
-        <Route
-          path="/staff/upload-design/:orderId"
-          element={
-            <Layout>
-              <PrivateRoute requiredRole={['employee', 'staff']}>
-                <DesignFileUpload />
-              </PrivateRoute>
-            </Layout>
-          }
-        />
-        <Route
-          path="/staff/templates"
-          element={
-            <Layout>
-              <PrivateRoute requiredRole={['employee', 'staff']}>
-                <StaffTemplateManagement />
-              </PrivateRoute>
-            </Layout>
-          }
-        />
-        <Route
-          path="/staff/templates/:id"
-          element={
-            <Layout>
-              <PrivateRoute requiredRole={['employee', 'staff']}>
-                <StaffTemplateDetail />
-              </PrivateRoute>
-            </Layout>
-          }
-        />
-
-        {/* ========================================== */}
-        {/* CỤM ROUTES: ADMIN                          */}
-        {/* ========================================== */}
-        <Route
-          path="/admin"
-          element={
-            <PrivateRoute requiredRole="admin">
-              <DashboardLayout />
-            </PrivateRoute>
-          }
-        >
-          <Route index element={<DashboardOverview />} />
-          <Route path="users" element={<ManageUsers />} />
-          <Route path="orders" element={<AdminOrderList />} />
-          <Route path="orders/:id" element={<AdminOrderDetail />} />
-          <Route path="products" element={<ManageProducts />} />
-          <Route path="materials" element={<ManageMaterials />} />
-          <Route path="design-templates" element={<ManageDesignTemplates />} />
-          <Route path="design-templates/create" element={<DesignTemplateEdit />} />
-          <Route path="design-templates/edit/:id" element={<DesignTemplateEdit />} />
-          <Route path="staff" element={<ManageStaffAccounts />} />
-          <Route path="shipments" element={<AdminShipmentList />} />
-          <Route path="inventory" element={<AdminInventory />} />
-          <Route path="services" element={<AdminServices />} />
-          <Route path="feedback" element={<FeedbackList />} />
-          <Route path="settings" element={<SystemSettings />} />
-        </Route>
+        <Route path="/staff/production-jobs/new" element={<StaffRoute><StaffCreateProductionJob /></StaffRoute>} />
+        <Route path="/staff/design-reviews" element={<StaffRoute><StaffDesignReviewsList /></StaffRoute>} />
+        <Route path="/staff/design-reviews/:id" element={<StaffRoute><StaffDesignReviewDetail /></StaffRoute>} />
+        <Route path="/staff/upload-design/:orderId" element={<StaffRoute><DesignFileUpload /></StaffRoute>} />
+        <Route path="/staff/templates" element={<StaffRoute><StaffTemplateManagement /></StaffRoute>} />
+        <Route path="/staff/templates/:id" element={<StaffRoute><StaffTemplateDetail /></StaffRoute>} />
 
         {/* ========================================== */}
         {/* CỤM ROUTES: CUSTOMER (PUBLIC & PROTECTED)  */}
@@ -481,7 +325,6 @@ const AppRouter = () => {
           }
         />
 
-        {/* ===== ĐÃ THÊM ROUTE PROFILE VÀO ĐÂY ===== */}
         <Route
           path="/profile"
           element={
@@ -492,7 +335,6 @@ const AppRouter = () => {
             </Layout>
           }
         />
-        {/* ======================================== */}
 
         <Route
           path="/cart"

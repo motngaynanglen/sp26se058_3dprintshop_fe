@@ -4,10 +4,24 @@ export const MAINFLOW2_ENDPOINTS = {
   BASE: '/api/mainflow-2/design-requests',
 };
 
-// Customer: Create a new design request
+// Customer: Create a new design request (mô tả + ảnh ý tưởng)
 export const createDesignRequest = async (payload) => {
   // payload: { title, requirementBrief, initialIdeaImageUrls: [] }
   const response = await axiosInstance.post(MAINFLOW2_ENDPOINTS.BASE, payload);
+  return response.data;
+};
+
+// Luồng 2: Khách upload STL/OBJ → KTV báo giá
+export const createCustomFilePrintRequest = async (payload) => {
+  // payload: { title, customerFileUrl, materialId?, technicalRequirements?, note? }
+  const response = await axiosInstance.post('/api/mainflow-2/print-requests', payload);
+  return response.data;
+};
+
+// Luồng 3: Khách gửi GLB từ AI → KTV báo giá
+export const createAiPrintRequest = async (payload) => {
+  // payload: { title?, modelFileUrl, sourceImageUrl?, prompt? }
+  const response = await axiosInstance.post('/api/mainflow-2/ai-print-requests', payload);
   return response.data;
 };
 
@@ -30,9 +44,9 @@ export const assignStaffToRequest = async (id) => {
   return response.data;
 };
 
-// Staff: Provide a quote
+// Staff: Provide a detailed quote (material + grams + labor) or flat price
 export const submitQuote = async (id, payload) => {
-  // payload: { quotedPrice, currency, staffNote, designFileUrls: [] }
+  // payload: { quotedPrice, currency, staffNote, laborCost?, components?, designFileUrls? }
   const response = await axiosInstance.post(`${MAINFLOW2_ENDPOINTS.BASE}/${id}/staff/quote`, payload);
   return response.data;
 };

@@ -1,111 +1,124 @@
-import React, { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Card, Button, Spin, message, Tag, Space, Typography, Alert } from 'antd';
+import { ArrowLeftOutlined, PrinterOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { getOrderDetailApi, updateOrderItemFulfillmentApi } from '../../api/orderApi';
+import { fulfillmentStatusMap, normStatus } from '../../utils/staffOrderConstants';
 
-const mockItem = {
-  id: 2,
-  name: "Tượng nhân vật custom",
-  status: "Approved",
-  progress: 0,
-  logs: [],
-};
+const { Title, Text } = Typography;
 
-const StaffCustomItemPrinting = () => {
+export default function StaffCustomItemPrinting() {
   const { orderId, itemId } = useParams();
   const navigate = useNavigate();
-  const [item, setItem] = useState(mockItem);
-  const [note, setNote] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [order, setOrder] = useState(null);
+  const [item, setItem] = useState(null);
 
-  const updateProgress = (value) => {
-    setItem((prev) => ({
-      ...prev,
-      progress: value,
-      logs: [
-        ...prev.logs,
-        {
-          time: new Date().toLocaleString(),
-          progress: value,
-          note,
-        },
-      ],
-    }));
-    setNote("");
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await getOrderDetailApi(orderId);
+        const data = res?.data || res;
+        setOrder(data);
+        const found = (data?.items || []).find((i) => String(i.id) === String(itemId));
+        setItem(found || null);
+        if (!found) message.warning('Không tìm thấy dòng hàng trong đơn');
+      } catch {
+        message.error('Không tải được thông tin đơn hàng');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [orderId, itemId]);
+
+  const updateStatus = async (fulfillmentStatus) => {
+    setBusy(true);
+    try {
+      const res = await updateOrderItemFulfillmentApi(itemId, { fulfillmentStatus });
+      message.success(res?.data?.message || `Đã cập nhật → ${fulfillmentStatus}`);
+      setItem((prev) => (prev ? { ...prev, fulfillmentStatus } : prev));
+    } catch (e) {
+      message.error(e?.response?.data?.message || 'Cập nhật thất bại');
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const markCompleted = () => {
-    updateProgress(100);
-    setItem((prev) => ({ ...prev, status: "Completed" }));
-    alert("Đã hoàn thành in!");
-  };
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: 64 }}>
+        <Spin size="large" />
+      </div>
+    );
+  }
+
+  const fs = normStatus(item?.fulfillmentStatus);
+  const fsMeta = fulfillmentStatusMap[fs];
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <button
-        onClick={() => navigate(-1)}
-        className="mb-4 text-sm text-indigo-600 hover:underline"
+    <div>
+      <Button
+        type="link"
+        icon={<ArrowLeftOutlined />}
+        onClick={() => navigate(`/staff/production-queue?orderId=${orderId}`)}
+        style={{ paddingLeft: 0, marginBottom: 16 }}
       >
-        ← Quay lại order
-      </button>
+        Về hàng đợi sản xuất
+      </Button>
 
-      <h1 className="text-2xl font-bold mb-4">
-        In item #{itemId} – {item.name}
-      </h1>
-      <p className="mb-4">Trạng thái: {item.status}</p>
+      <Title level={4}>
+        In sản phẩm — {item?.itemName || itemId}
+      </Title>
+      <Text type="secondary">Đơn: {order?.code || orderId}</Text>
 
-      <div className="border rounded-lg p-5 bg-white shadow space-y-4">
-        <div>
-          <label className="block font-medium mb-1">Tiến độ in (%)</label>
-          <input
-            type="range"
-            min="0"
-            max="100"
-            value={item.progress}
-            onChange={(e) => updateProgress(Number(e.target.value))}
-            className="w-full"
-          />
-          <p className="mt-1 text-sm">{item.progress}%</p>
-        </div>
+      {!item ? (
+        <Alert type="error" message="Không tìm thấy dòng hàng" style={{ marginTop: 16 }} />
+      ) : (
+        <Card style={{ marginTop: 16 }}>
+          <Space direction="vertical" size="large" style={{ width: '100%' }}>
+            <div>
+              <Text type="secondary">Trạng thái hiện tại: </Text>
+              {fsMeta ? (
+                <Tag color={fsMeta.color}>{fsMeta.label}</Tag>
+              ) : (
+                <Tag>{fs || '—'}</Tag>
+              )}
+            </div>
 
-        <div>
-          <label className="block font-medium mb-1">Ghi chú cho khách</label>
-          <textarea
-            className="w-full border rounded p-2"
-            rows="3"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="VD: Đã in xong phần thân, đang in chi tiết nhỏ..."
-          />
-        </div>
+            <Space wrap>
+              {fs !== 'PRINTING' && fs !== 'FINISHED' && (
+                <Button
+                  type="primary"
+                  icon={<PrinterOutlined />}
+                  loading={busy}
+                  onClick={() => updateStatus('PRINTING')}
+                >
+                  Bắt đầu in
+                </Button>
+              )}
+              {fs === 'PRINTING' && (
+                <Button
+                  type="primary"
+                  icon={<CheckCircleOutlined />}
+                  loading={busy}
+                  onClick={() => updateStatus('FINISHED')}
+                >
+                  Hoàn thiện in
+                </Button>
+              )}
+              {fs === 'FINISHED' && (
+                <Alert type="success" message="Sản phẩm đã hoàn thiện in." showIcon />
+              )}
+            </Space>
 
-        <div className="flex gap-3">
-          <button
-            onClick={() => updateProgress(item.progress)}
-            className="px-4 py-2 bg-indigo-600 text-white rounded"
-          >
-            Cập nhật tiến độ
-          </button>
-          <button
-            onClick={markCompleted}
-            className="px-4 py-2 bg-green-600 text-white rounded"
-          >
-            Đánh dấu hoàn thành
-          </button>
-        </div>
-      </div>
-
-      {item.logs.length > 0 && (
-        <div className="mt-6 border rounded-lg p-4 bg-gray-50">
-          <p className="font-medium mb-2">Lịch sử cập nhật:</p>
-          <ul className="space-y-1 text-sm">
-            {item.logs.map((log, idx) => (
-              <li key={idx}>
-                {log.time} – {log.progress}% – {log.note}
-              </li>
-            ))}
-          </ul>
-        </div>
+            <Button onClick={() => navigate(`/staff/shop-orders?openOrderId=${orderId}`)}>
+              Mở đơn hàng để giao GHN
+            </Button>
+          </Space>
+        </Card>
       )}
     </div>
   );
-};
-
-export default StaffCustomItemPrinting;
+}

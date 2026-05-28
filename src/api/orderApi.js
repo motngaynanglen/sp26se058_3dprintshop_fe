@@ -29,3 +29,25 @@ export const performTransactionApi = async (payload) => {
   const response = await axiosInstance.post('/api/transaction/perform-transaction', payload);
   return response.data;
 };
+
+// 6. [Staff/Manager] Cập nhật trạng thái đơn hàng + shipment
+export const updateOrderStatusApi = async (id, payload) => {
+  // payload: { orderStatus, shipmentStatus?, trackingNumber?, note? }
+  const response = await axiosInstance.patch(`/api/order/${id}/status`, payload);
+  return response.data;
+};
+
+/** [Staff] Hàng đợi sản xuất (flow 2/3, pre-order đã TT). */
+export const getProductionQueueApi = async (payload) => {
+  const response = await axiosInstance.post('/api/order/production-queue', payload);
+  return response.data;
+};
+
+/** [Staff] Cập nhật FulfillmentStatus dòng hàng (PRINTING → FINISHED). */
+export const updateOrderItemFulfillmentApi = async (orderItemId, payload) => {
+  const response = await axiosInstance.patch(
+    `/api/order/items/${orderItemId}/fulfillment`,
+    payload,
+  );
+  return response.data;
+};

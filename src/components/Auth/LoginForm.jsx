@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
+import { getPostLoginPath } from "../../utils/authRedirect";
 import { App } from "antd";
 
 const LoginForm = ({ onSuccess }) => {
@@ -27,11 +28,7 @@ const LoginForm = ({ onSuccess }) => {
                 // Nếu component cha (ví dụ Modal) có truyền hàm onSuccess vào, thì gọi nó (để đóng Modal)
                 if (onSuccess) onSuccess();
 
-                const role = result.user?.role?.toLowerCase();
-                if (role === 'manager') navigate('/manager/dashboard');
-                else if (role === 'admin') navigate('/admin');
-                else if (['employee', 'staff'].includes(role)) navigate('/staff/dashboard');
-                else navigate('/');
+                navigate(getPostLoginPath(result.user?.role));
             } else {
                 setError(result.message || "Tên đăng nhập hoặc mật khẩu không đúng");
             }

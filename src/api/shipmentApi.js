@@ -23,3 +23,23 @@ export const updateShipmentApi = async (id, payload) => {
   const response = await axiosInstance.patch(`/api/shipment/${id}/update`, payload);
   return response.data;
 };
+
+// 5. Báo phí GHN
+export const getShippingQuotesApi = async (payload) => {
+  const response = await axiosInstance.post('/api/shipment/quotes', payload);
+  return response.data;
+};
+
+// 6. [Staff/Manager] Tạo vận đơn GHN
+export const createCarrierShipmentApi = async (orderId, payload) => {
+  const response = await axiosInstance.post(
+    `/api/shipment/order/${orderId}/create-carrier`,
+    payload,
+  );
+  return response.data;
+};
+
+export const CARRIER_LABELS = {
+  GHN: 'Giao Hàng Nhanh (GHN)',
+  MANUAL: 'Tự giao / thủ công',
+};

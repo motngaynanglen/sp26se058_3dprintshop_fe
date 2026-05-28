@@ -65,7 +65,7 @@ const CustomOrderType = () => {
             <div className="text-6xl mb-6 group-hover:scale-110 transition-transform">🤖</div>
             <h2 className="text-2xl font-bold mb-4 text-gray-800">AI Tạo mẫu</h2>
             <p className="text-gray-600 leading-relaxed">
-              Sử dụng công cụ AI để chuyển đổi hình ảnh ý tưởng thành mô hình 3D mẫu
+              Upload 1 ảnh → AI tạo GLB → KTV báo giá in → duyệt & thanh toán → in 3D & giao hàng
             </p>
           </div>
         </Link>

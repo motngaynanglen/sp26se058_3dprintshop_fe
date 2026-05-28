@@ -1,9 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Spin, message, Modal, Input, Button } from 'antd';
-import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
-import { getDesignRequestDetail, approveQuote, cancelDesignRequest, postDesignRequestMessage } from '../api/mainflow2Api';
+import { Spin, message, Modal, Button } from 'antd';
+import { getDesignRequestDetail, approveQuote, cancelDesignRequest, postDesignRequestMessage, uploadFile } from '../api/mainflow2Api';
 import { useAuth } from '../contexts/AuthContext';
+import useMainflow2Realtime from '../hooks/useMainflow2Realtime';
+import QuoteMessageCard from '../components/Mainflow2/QuoteMessageCard';
+import ChatMessageBubble, { ChatComposer } from '../components/Mainflow2/ChatMessageBubble';
+import { getMessageAuthorId } from '../components/Mainflow2/messageMetadataUtils';
+import Model3DPreview from '../components/Mainflow2/Model3DPreview';
 
 const CUSTOM_STATUS_STEPS = [
   { key: 'SUBMITTED', label: 'Gửi yêu cầu' },
@@ -22,6 +26,35 @@ const STATUS_LABEL = {
   NEGOTIATING: 'Đang thương lượng',
   APPROVED: 'Đã duyệt',
   CANCELLED: 'Đã hủy',
+};
+
+const LINKED_ORDER_STATUS_LABEL = {
+  PENDING: 'Chờ xác nhận',
+  PROCESSING: 'Đang sản xuất / in 3D',
+  READY_FOR_SHIP: 'Sẵn sàng giao',
+  FINISHED: 'Chờ giao hàng',
+  COMPLETED: 'Hoàn thành',
+  CANCELLED: 'Đã hủy',
+};
+
+const SHIPMENT_STATUS_LABEL = {
+  PREPARING: 'Đang đóng gói',
+  READY_FOR_PICKUP: 'Chờ lấy hàng',
+  IN_TRANSIT: 'Đang giao',
+  DELIVERED: 'Đã giao',
+};
+
+const goToDesignCheckout = (navigate, order) => {
+  const versions = order.versions || order.quoteFileVersions || [];
+  navigate('/checkout', {
+    state: {
+      designWorkId: order.id,
+      designWorkSourceType: order.sourceType || 'CUSTOM_QUOTE_MF2',
+      designWorkName: order.title ? `Thiết kế: ${order.title}` : 'Thiết kế theo yêu cầu',
+      designWorkPrice: order.latestQuotedPrice,
+      returnTo: `/custom-orders/${order.id}`,
+    },
+  });
 };
 
 const formatPrice = (price) =>
@@ -46,6 +79,7 @@ const CustomOrderDetail = () => {
   const [processing, setProcessing] = useState(false);
 
   const [chatMessage, setChatMessage] = useState('');
+  const [uploading, setUploading] = useState(false);
   const messagesContainerRef = useRef(null);
 
   useEffect(() => {
@@ -54,35 +88,9 @@ const CustomOrderDetail = () => {
     el.scrollTop = el.scrollHeight;
   }, [order?.messages]);
 
-  useEffect(() => {
-    fetchDetail();
-
-    const token = localStorage.getItem('token');
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://103.90.227.51:8080/';
-    const hubUrl = `${baseUrl.replace(/\/$/, '')}/hubs/mainflow-2-design`;
-
-    const connection = new HubConnectionBuilder()
-      .withUrl(hubUrl, { accessTokenFactory: () => token })
-      .withAutomaticReconnect()
-      .configureLogging(LogLevel.Information)
-      .build();
-
-    connection.start()
-      .then(() => {
-        connection.invoke('JoinDesignWork', id).catch(console.error);
-        connection.on('Mainflow2Event', () => fetchDetail(true));
-      })
-      .catch(err => console.error('SignalR Error:', err));
-
-    return () => {
-      connection.invoke('LeaveDesignWork', id).catch(console.error);
-      connection.stop();
-    };
-  }, [id]);
-
-  const fetchDetail = async (silent = false) => {
+  const fetchDetail = useCallback(async (silent = false) => {
     try {
-      if (!silent && !order) setLoading(true);
+      if (!silent) setLoading(true);
       const res = await getDesignRequestDetail(id);
       if (res?.statusCode === 200) setOrder(res.data);
       else message.error(res?.message || 'Không tìm thấy chi tiết yêu cầu');
@@ -91,15 +99,42 @@ const CustomOrderDetail = () => {
     } finally {
       if (!silent) setLoading(false);
     }
-  };
+  }, [id]);
 
-  const handleSendChat = async () => {
-    if (!chatMessage.trim()) return;
+  useEffect(() => {
+    fetchDetail();
+  }, [id]);
+
+  useMainflow2Realtime(id, () => fetchDetail(true));
+
+  const handleSendChat = async ({ content, file }) => {
+    const text = content?.trim();
+    if (!text && !file) return;
     try {
-      const res = await postDesignRequestMessage(id, { content: chatMessage, attachmentUrls: [] });
-      if (res?.statusCode === 200) { setChatMessage(''); fetchDetail(true); }
-      else message.error(res?.message || 'Lỗi gửi tin');
-    } catch { message.error('Lỗi khi gửi tin nhắn'); }
+      setUploading(true);
+      let attachmentUrls = [];
+      if (file) {
+        const up = await uploadFile(file);
+        const url = up?.data?.publicUrl || up?.data?.url || up?.publicUrl || up?.url;
+        if (!url) {
+          message.error('Upload file thất bại');
+          return;
+        }
+        attachmentUrls = [url];
+      }
+      const res = await postDesignRequestMessage(id, {
+        content: text || `[File: ${file?.name || 'đính kèm'}]`,
+        attachmentUrls,
+      });
+      if (res?.statusCode === 200) {
+        setChatMessage('');
+        fetchDetail(true);
+      } else message.error(res?.message || 'Lỗi gửi tin');
+    } catch {
+      message.error('Lỗi khi gửi tin nhắn');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleApprove = () => {
@@ -146,6 +181,31 @@ const CustomOrderDetail = () => {
     );
   }
 
+  const linkedOrderId = order?.orderId;
+  const isPaid = order?.linkedPaymentStatus === 'PAID';
+  const hasLinkedOrder = Boolean(linkedOrderId);
+  const showPayButtons = order?.status === 'APPROVED' && !hasLinkedOrder;
+  const showAwaitingPayment = hasLinkedOrder && !isPaid;
+  const showProduction = hasLinkedOrder && isPaid;
+  const fileVersions = order?.versions || order?.quoteFileVersions || [];
+  const timelineSteps = order?.timeline?.length > 0 ? order.timeline : null;
+
+  const headerStatusLabel = showProduction
+      ? (order.linkedOrderStatus === 'FINISHED' || order.linkedShipmentStatus === 'READY_FOR_PICKUP'
+      ? (LINKED_ORDER_STATUS_LABEL.READY_FOR_SHIP ?? 'Sẵn sàng giao (chờ GHN)')
+      : order.linkedShipmentStatus === 'IN_TRANSIT'
+        ? 'Đang giao hàng'
+        : order.linkedOrderStatus === 'PROCESSING' || order.linkedShipmentStatus === 'PREPARING'
+          ? 'Đang sản xuất / in 3D'
+          : SHIPMENT_STATUS_LABEL[order.linkedShipmentStatus]
+            || LINKED_ORDER_STATUS_LABEL[order.linkedOrderStatus]
+            || 'Đang xử lý đơn')
+    : (STATUS_LABEL[order?.status] || order?.status);
+
+  const headerStatusStyle = showProduction
+    ? { background: '#eff6ff', color: '#2563eb' }
+    : statusColor(order?.status);
+
   if (!order) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 64px)' }}>
@@ -168,9 +228,17 @@ const CustomOrderDetail = () => {
           <p style={{ margin: 0, fontWeight: 700, fontSize: 15, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{order.title}</p>
           <p style={{ margin: 0, fontSize: 11, color: '#9ca3af', fontFamily: 'monospace' }}>#{order.id?.slice(0, 8)}</p>
         </div>
-        <span style={{ padding: '3px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, ...statusColor(order.status) }}>
-          {STATUS_LABEL[order.status] || order.status}
+        <span style={{ padding: '3px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, ...headerStatusStyle }}>
+          {headerStatusLabel}
         </span>
+        {showProduction && linkedOrderId && (
+          <Link
+            to={`/orders/${linkedOrderId}`}
+            style={{ fontSize: 12, color: '#4f46e5', fontWeight: 600, textDecoration: 'none' }}
+          >
+            Xem đơn {order.linkedOrderCode ? `#${order.linkedOrderCode}` : ''}
+          </Link>
+        )}
         {order.status !== 'CANCELLED' && order.status !== 'APPROVED' && (
           <button onClick={handleCancel} disabled={processing}
             style={{ padding: '4px 14px', borderRadius: 8, border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
@@ -191,82 +259,25 @@ const CustomOrderDetail = () => {
 
 {/* Messages + inline quotes */}
             {order.messages?.length > 0 ? order.messages.map((msg, i) => {
-              const isMe = msg.authorAccountId === user?.id;
+              const isMe = getMessageAuthorId(msg) === user?.id;
               const isQuote = msg.logType && msg.logType.toUpperCase().includes('QUOTE');
 
               if (isQuote) {
                 let meta = null;
                 try { meta = msg.metadataJson ? JSON.parse(msg.metadataJson) : null; } catch {}
-                const hasPrice = meta?.quotedPrice != null;
+                const isLatestQuote = i === order.messages.length - 1;
+                const canApprove =
+                  (order.status === 'QUOTED' || order.status === 'NEGOTIATING') && isLatestQuote;
                 return (
-                  <div key={i} style={{ alignSelf: msg.authorAccountId === user?.id ? 'flex-end' : 'flex-start', width: '100%', marginBottom: 12 }}>
-                    <div style={{ background: '#ecfdf5', border: '1px solid #6ee7b7', borderRadius: '16px 16px 16px 4px', padding: '14px 18px' }}>
-                      <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: 1 }}>
-                        💰 Báo giá từ nhân viên{meta?.revisionNumber ? ` · Rev ${meta.revisionNumber}` : ''}
-                      </p>
-                      {hasPrice && (
-                        <p style={{ margin: '0 0 8px', fontSize: 24, fontWeight: 800, color: '#065f46' }}>
-                          {formatPrice(meta.quotedPrice)}
-                        </p>
-                      )}
-                      {msg.content && <p style={{ margin: '0 0 8px', fontSize: 13, color: '#374151', lineHeight: 1.5 }}>{msg.content}</p>}
-                      {meta?.designFileUrls?.filter(u => u && u.trim() !== "").length > 0 && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12, padding: '12px', background: 'rgba(255,255,255,0.9)', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)' }}>
-                          {[...new Set(meta.designFileUrls.filter(u => u && u.trim() !== ""))].slice(1).map((url, fi) => {
-                            const lowUrl = url.toLowerCase();
-                            const isGLB = lowUrl.endsWith('.glb');
-                            const isImage = lowUrl.endsWith('.png') || lowUrl.endsWith('.jpg') || lowUrl.endsWith('.jpeg') || lowUrl.endsWith('.webp');
-
-                            if (isGLB) {
-                              return (
-                                <div key={fi} style={{ position: 'relative' }}>
-                                  <div style={{ width: '100%', height: 260, borderRadius: 8, overflow: 'hidden', background: 'linear-gradient(to bottom, #f8fafc, #f1f5f9)', border: '1px solid #e2e8f0' }}>
-                                    <model-viewer
-                                      src={url}
-                                      camera-controls
-                                      auto-rotate
-                                      shadow-intensity="1"
-                                      environment-image="neutral"
-                                      exposure="1"
-                                      style={{ width: '100%', height: '100%' }}
-                                    />
-                                  </div>
-                                  <a href={url} target="_blank" rel="noreferrer" 
-                                    style={{ position: 'absolute', bottom: 8, right: 8, background: 'rgba(255,255,255,0.9)', padding: '5px 10px', borderRadius: 6, fontSize: 11, color: '#475569', textDecoration: 'none', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
-                                    <span>💾</span> Tải về GLB
-                                  </a>
-                                </div>
-                              );
-                            }
-
-                            if (isImage) {
-                              return (
-                                <a key={fi} href={url} target="_blank" rel="noreferrer" style={{ display: 'block', borderRadius: 8, overflow: 'hidden', border: '1px solid #e2e8f0 shadow-sm' }}>
-                                  <img src={url} alt="" style={{ width: '100%', maxHeight: 300, objectFit: 'contain', display: 'block', background: '#f8fafc' }} />
-                                </a>
-                              );
-                            }
-
-                            return (
-                              <a key={fi} href={url} target="_blank" rel="noreferrer"
-                                style={{ fontSize: 13, color: '#2563eb', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: '#fff', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-                                <span style={{ fontSize: 18 }}>📎</span>
-                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500, maxWidth: 300 }}>{url.split('/').pop()}</span>
-                              </a>
-                            );
-                          })}
-                        </div>
-                      )}
-                      {/* Approve button inline with quote */}
-                      {(order.status === 'QUOTED' || order.status === 'NEGOTIATING') && i === order.messages.length - 1 && (
-                        <div style={{ marginTop: 12 }}>
-                          <Button type="primary" style={{ background: '#059669', borderColor: '#059669', width: '100%' }}
-                            onClick={handleApprove} loading={processing}>
-                            ✓ Chấp nhận báo giá này
-                          </Button>
-                        </div>
-                      )}
-                    </div>
+                  <div key={msg.id || i} style={{ width: '100%', marginBottom: 12 }}>
+                    <QuoteMessageCard
+                      meta={meta}
+                      staffNote={msg.content}
+                      revision={meta?.revision}
+                      showApprove={canApprove}
+                      onApprove={handleApprove}
+                      approveLoading={processing}
+                    />
                     <span style={{ fontSize: 10, color: '#9ca3af', marginTop: 3, display: 'block' }}>
                       {new Date(msg.created).toLocaleString('vi-VN')} · Nhân viên
                     </span>
@@ -275,22 +286,12 @@ const CustomOrderDetail = () => {
               }
 
               return (
-                <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
-                  <div style={{
-                    padding: '8px 14px',
-                    borderRadius: isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-                    maxWidth: '70%', fontSize: 14, lineHeight: 1.5, wordBreak: 'break-word',
-                    background: isMe ? '#4f46e5' : '#fff',
-                    color: isMe ? '#fff' : '#1f2937',
-                    border: isMe ? 'none' : '1px solid #e5e7eb',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-                  }}>
-                    {msg.content}
-                  </div>
-                  <span style={{ fontSize: 10, color: '#9ca3af', marginTop: 3 }}>
-                    {new Date(msg.created).toLocaleString('vi-VN')} · {isMe ? 'Tôi' : 'Nhân viên'}
-                  </span>
-                </div>
+                <ChatMessageBubble
+                  key={msg.id || i}
+                  msg={msg}
+                  isMe={isMe}
+                  otherLabel="Nhân viên"
+                />
               );
             }) : (
               <div style={{ textAlign: 'center', color: '#9ca3af', fontSize: 13, marginTop: 40 }}>
@@ -300,53 +301,62 @@ const CustomOrderDetail = () => {
           </div>
 
           {/* Composer */}
-          <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', display: 'flex', alignItems: 'flex-end', gap: 8 }}>
-            {order.status === 'CANCELLED' ? (
-              <div style={{ flex: 1, textAlign: 'center', color: '#dc2626', fontSize: 13, fontWeight: 500 }}>Yêu cầu đã bị hủy.</div>
-            ) : order.status === 'APPROVED' ? (
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '10px 0' }}>
-                <div style={{ color: '#059669', fontSize: 14, fontWeight: 600 }}>
-                  🎉 Chúc mừng! Thiết kế đã được duyệt với giá {formatPrice(order.latestQuotedPrice)}
-                </div>
-                <Button 
-                  type="primary" 
-                  size="large"
-                  style={{ background: '#4f46e5', borderColor: '#4f46e5', height: 48, borderRadius: 12, padding: '0 32px', fontWeight: 700, fontSize: 16 }}
-                  onClick={() => navigate('/checkout', { 
-                    state: { 
-                      product: { 
-                        id: order.id, 
-                        name: `Thiết kế: ${order.title}`, 
-                        latestQuotedPrice: order.latestQuotedPrice,
-                        modelSrc: order.quoteFileVersions?.[0]?.fileUrl || order.quoteFileVersions?.[0]?.url 
-                      }, 
-                      quantity: 1, 
-                      sourceType: 'CUSTOM_QUOTE_MF2' 
-                    } 
-                  })}
-                >
-                  🚀 Thanh toán & Đặt hàng ngay
-                </Button>
-                <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>Bấm tiền hành thanh toán để chúng tôi bắt đầu sản xuất và gửi hàng cho bạn.</p>
+          {order.status === 'CANCELLED' ? (
+            <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center', color: '#dc2626', fontSize: 13, fontWeight: 500 }}>
+              Yêu cầu đã bị hủy.
+            </div>
+          ) : showProduction ? (
+            <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center' }}>
+              <p style={{ margin: '0 0 6px', color: '#2563eb', fontSize: 14, fontWeight: 700 }}>
+                Đơn đã thanh toán — đang theo dõi tiến độ sản xuất & giao hàng
+              </p>
+              <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>
+                {order.linkedTrackingNumber
+                  ? `Mã vận đơn: ${order.linkedTrackingNumber}`
+                  : 'Shop sẽ cập nhật trạng thái khi bắt đầu in và giao hàng.'}
+              </p>
+            </div>
+          ) : showAwaitingPayment ? (
+            <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+              <div style={{ color: '#d97706', fontSize: 14, fontWeight: 600 }}>
+                Đơn hàng đã tạo — vui lòng hoàn tất thanh toán để bắt đầu sản xuất
               </div>
-            ) : (
-              <>
-                <Input.TextArea
-                  autoSize={{ minRows: 1, maxRows: 4 }}
-                  value={chatMessage}
-                  onChange={e => setChatMessage(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendChat(); } }}
-                  placeholder="Nhập tin nhắn... (Enter để gửi, Shift+Enter xuống dòng)"
-                  style={{ flex: 1, resize: 'none', borderRadius: 12, fontSize: 14 }}
-                />
-                <Button type="primary"
-                  style={{ background: '#4f46e5', flexShrink: 0, height: 36, borderRadius: 12 }}
-                  disabled={!chatMessage.trim()} onClick={handleSendChat}>
-                  Gửi →
-                </Button>
-              </>
-            )}
-          </div>
+              <Button
+                type="primary"
+                size="large"
+                style={{ background: '#4f46e5', borderColor: '#4f46e5', height: 44, borderRadius: 12, fontWeight: 700 }}
+                onClick={() => navigate(`/orders/${linkedOrderId}`)}
+              >
+                Thanh toán đơn {order.linkedOrderCode ? `#${order.linkedOrderCode}` : ''}
+              </Button>
+            </div>
+          ) : showPayButtons ? (
+            <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+              <div style={{ color: '#059669', fontSize: 14, fontWeight: 600 }}>
+                🎉 Chúc mừng! Thiết kế đã được duyệt với giá {formatPrice(order.latestQuotedPrice)}
+              </div>
+              <Button
+                type="primary"
+                size="large"
+                style={{ background: '#4f46e5', borderColor: '#4f46e5', height: 48, borderRadius: 12, padding: '0 32px', fontWeight: 700, fontSize: 16 }}
+                onClick={() => goToDesignCheckout(navigate, order)}
+              >
+                🚀 Thanh toán & Đặt hàng ngay
+              </Button>
+              <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>Bấm để thanh toán — shop sẽ bắt đầu sản xuất và gửi hàng cho bạn.</p>
+            </div>
+          ) : order.status === 'APPROVED' ? (
+            <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center', color: '#6b7280', fontSize: 13 }}>
+              Yêu cầu đã duyệt. Liên hệ shop nếu cần hỗ trợ đơn hàng.
+            </div>
+          ) : (
+            <ChatComposer
+              value={chatMessage}
+              onChange={setChatMessage}
+              onSend={handleSendChat}
+              uploading={uploading}
+            />
+          )}
         </div>
 
         {/* RIGHT SIDEBAR */}
@@ -354,15 +364,25 @@ const CustomOrderDetail = () => {
 
           {/* Timeline */}
           <div style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
-            <p style={{ margin: '0 0 12px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>Tiến trình</p>
+            <p style={{ margin: '0 0 12px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>
+              {showProduction ? 'Tiến độ làm việc' : 'Tiến trình'}
+            </p>
             <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 0 }}>
-              {CUSTOM_STATUS_STEPS.map((step, idx) => {
-                const currentIdx = STATUS_ORDER.indexOf(order.status);
-                const isDone = idx < currentIdx || (idx === currentIdx && order.status !== 'CANCELLED');
-                const isCurrent = idx === currentIdx && order.status !== 'CANCELLED';
+              {(timelineSteps || CUSTOM_STATUS_STEPS.map(s => ({ code: s.key, label: s.label }))).map((step, idx, arr) => {
+                const stepCode = step.code || step.key;
+                let isDone;
+                let isCurrent;
+                if (timelineSteps) {
+                  isDone = Boolean(step.isDone);
+                  isCurrent = Boolean(step.isCurrent);
+                } else {
+                  const currentIdx = STATUS_ORDER.indexOf(order.status);
+                  isDone = idx < currentIdx || (idx === currentIdx && order.status !== 'CANCELLED');
+                  isCurrent = idx === currentIdx && order.status !== 'CANCELLED';
+                }
                 return (
-                  <li key={step.key} style={{ display: 'flex', gap: 12, paddingBottom: idx < CUSTOM_STATUS_STEPS.length - 1 ? 16 : 0, position: 'relative' }}>
-                    {idx < CUSTOM_STATUS_STEPS.length - 1 && (
+                  <li key={stepCode || idx} style={{ display: 'flex', gap: 12, paddingBottom: idx < arr.length - 1 ? 16 : 0, position: 'relative' }}>
+                    {idx < arr.length - 1 && (
                       <div style={{ position: 'absolute', left: 11, top: 24, width: 2, bottom: 0, background: isDone ? '#4f46e5' : '#e5e7eb' }} />
                     )}
                     <div style={{
@@ -381,7 +401,7 @@ const CustomOrderDetail = () => {
                   </li>
                 );
               })}
-              {order.status === 'CANCELLED' && (
+              {!timelineSteps && order.status === 'CANCELLED' && (
                 <li style={{ display: 'flex', gap: 12, marginTop: 8 }}>
                   <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#fef2f2', border: '1px solid #fca5a5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#dc2626' }}>✕</div>
                   <p style={{ margin: 'auto 0', fontSize: 13, fontWeight: 600, color: '#dc2626' }}>Đã hủy</p>
@@ -404,43 +424,60 @@ const CustomOrderDetail = () => {
                 </Button>
               )}
 
-              {order.status === 'APPROVED' && (
-                <Button 
+              {showPayButtons && (
+                <Button
                   type="primary"
                   style={{ background: '#4f46e5', borderColor: '#4f46e5', width: '100%', fontWeight: 700 }}
-                  onClick={() => navigate('/checkout', { 
-                    state: { 
-                      product: { 
-                        id: order.id, 
-                        name: `Thiết kế: ${order.title}`, 
-                        latestQuotedPrice: order.latestQuotedPrice,
-                        modelSrc: order.quoteFileVersions?.[0]?.fileUrl || order.quoteFileVersions?.[0]?.url 
-                      }, 
-                      quantity: 1, 
-                      sourceType: 'CUSTOM_QUOTE_MF2' 
-                    } 
-                  })}
+                  onClick={() => goToDesignCheckout(navigate, order)}
                 >
                   🚀 Thanh toán ngay
                 </Button>
               )}
+              {showAwaitingPayment && (
+                <Button
+                  type="primary"
+                  style={{ background: '#d97706', borderColor: '#d97706', width: '100%', fontWeight: 700 }}
+                  onClick={() => navigate(`/orders/${linkedOrderId}`)}
+                >
+                  Hoàn tất thanh toán
+                </Button>
+              )}
+              {showProduction && (
+                <Link
+                  to={`/orders/${linkedOrderId}`}
+                  style={{
+                    display: 'block', textAlign: 'center', marginTop: 8, padding: '8px 12px',
+                    background: '#eff6ff', borderRadius: 8, color: '#2563eb', fontSize: 13, fontWeight: 600, textDecoration: 'none',
+                  }}
+                >
+                  Chi tiết đơn hàng →
+                </Link>
+              )}
+            </div>
+          )}
+
+          {/* 3D preview */}
+          {(order.latestQuotePreviewUrl || order.customerFileUrl) && (
+            <div style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
+              <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>
+                Xem trước 3D
+              </p>
+              <Model3DPreview fileUrl={order.latestQuotePreviewUrl || order.customerFileUrl} height={180} />
             </div>
           )}
 
           {/* File versions */}
-          {order.quoteFileVersions?.length > 0 && (
+          {fileVersions.length > 0 && (
             <div style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
               <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>File 3D đính kèm</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {order.quoteFileVersions.map((f, i) => (
-                  <a key={i} href={f.fileUrl || f.url} target="_blank" rel="noreferrer"
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#f0f4ff', borderRadius: 8, textDecoration: 'none', border: '1px solid #e0e7ff' }}>
-                    <span style={{ fontSize: 18 }}>📦</span>
-                    <div style={{ minWidth: 0 }}>
-                      <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#3730a3', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.title || `File v${f.versionNumber}`}</p>
-                      <p style={{ margin: 0, fontSize: 10, color: '#6b7280' }}>Phiên bản {f.versionNumber}</p>
-                    </div>
-                  </a>
+                {fileVersions.map((f, i) => (
+                  <div key={i}>
+                    <Model3DPreview fileUrl={f.fileUrl || f.url} height={140} />
+                    <p style={{ margin: '4px 0 0', fontSize: 10, color: '#6b7280' }}>
+                      {f.title || `File v${f.versionNumber}`} · Phiên bản {f.versionNumber}
+                    </p>
+                  </div>
                 ))}
               </div>
             </div>

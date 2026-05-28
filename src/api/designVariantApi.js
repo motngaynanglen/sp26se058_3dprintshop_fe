@@ -2,6 +2,15 @@ import axiosInstance from './axiosInstance';
 import { DESIGN_VARIANT_ENDPOINTS } from './endpoints';
 
 const designVariantApi = {
+  getDetail: async (id) => {
+    try {
+      const response = await axiosInstance.get(`${DESIGN_VARIANT_ENDPOINTS.DETAIL}/${id}/detail`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
   // Query all variants with filtering
   getAll: async (params) => {
     try {

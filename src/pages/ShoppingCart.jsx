@@ -232,7 +232,19 @@ const ShoppingCart = () => {
             )}
 
             <button
-              onClick={() => navigate('/checkout')}
+              onClick={() => {
+                const cartItems = items.map((item) => ({
+                  variantId: item.product.id != null ? String(item.product.id) : undefined,
+                  name: item.product.name,
+                  designTemplateName: item.product.designTemplateName,
+                  price: item.product.price,
+                  quantity: item.quantity,
+                  material: item.material,
+                  modelSrc: item.product.modelSrc,
+                  sourceType: item.product.sourceType === 'pre_order' ? 'PRE_ORDER' : 'IN_STOCK',
+                }));
+                navigate('/checkout', { state: { cartItems } });
+              }}
               className="w-full py-3.5 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 active:bg-indigo-800 transition-colors duration-200 cursor-pointer"
             >
               Tiến hành thanh toán

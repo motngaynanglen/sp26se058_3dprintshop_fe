@@ -1,5 +1,7 @@
-import React from 'react';
-import { useLocation, Link } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useLocation, Link, useSearchParams } from 'react-router-dom';
+import { Spin } from 'antd';
+import { getOrderDetailApi } from '../api/orderApi';
 
 const CheckCircleIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-16 h-16 text-emerald-500">
@@ -13,36 +15,122 @@ const ArrowRightIcon = () => (
   </svg>
 );
 
+const formatPrice = (price) =>
+  new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price || 0);
+
 const OrderConfirmation = () => {
   const location = useLocation();
-  const orderId = location.state?.orderId || 'ORD-12345';
+  const [searchParams] = useSearchParams();
+
+  const orderId = searchParams.get('orderId') || location.state?.orderId;
+  const codeFromUrl = searchParams.get('code');
+  const paidFromUrl = searchParams.get('paid') === '1';
+
+  const [order, setOrder] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!orderId) {
+      setLoading(false);
+      setError('Không tìm thấy mã đơn hàng.');
+      return;
+    }
+
+    const fetchOrder = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await getOrderDetailApi(orderId);
+        const orderData = response?.data || response;
+        setOrder(orderData);
+      } catch (err) {
+        console.error('Failed to fetch order confirmation:', err);
+        setError(
+          err?.response?.data?.detail
+          || err?.response?.data?.message
+          || err?.response?.data?.title
+          || 'Không thể tải thông tin đơn hàng.',
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrder();
+  }, [orderId]);
+
+  const orderCode = order?.code || codeFromUrl || location.state?.orderCode;
+  const isPaid = paidFromUrl
+    || order?.invoice?.paymentStatus?.toUpperCase() === 'PAID'
+    || ['PAID', 'PROCESSING', 'CONFIRMED', 'FINISHED', 'SHIPPING', 'COMPLETED'].includes(
+      (order?.orderStatus || '').toUpperCase(),
+    );
+
+  if (loading) {
+    return (
+      <div className="max-w-2xl mx-auto px-6 py-16 flex justify-center">
+        <Spin size="large" tip="Đang tải thông tin đơn hàng..." />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-2xl mx-auto px-6 py-16">
+        <div className="bg-white rounded-2xl border border-red-100 shadow-sm p-12 text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-3">Không thể hiển thị đơn hàng</h1>
+          <p className="text-gray-500 mb-8">{error}</p>
+          <Link
+            to="/my-orders"
+            className="inline-flex items-center justify-center py-3 px-6 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors duration-200"
+          >
+            Xem đơn hàng của tôi
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-16">
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        {/* Top accent bar */}
         <div className="h-1.5 bg-gradient-to-r from-indigo-500 to-emerald-500" />
 
         <div className="p-12 text-center">
-          {/* Icon */}
           <div className="flex justify-center mb-6">
             <CheckCircleIcon />
           </div>
 
-          {/* Heading */}
-          <h1 className="text-3xl font-bold text-gray-900 mb-3">Đặt hàng thành công!</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-3">
+            {isPaid ? 'Thanh toán thành công!' : 'Đặt hàng thành công!'}
+          </h1>
           <p className="text-gray-500 mb-8 leading-relaxed">
-            Cảm ơn bạn đã mua hàng. Đơn hàng của bạn đã được tiếp nhận và đang được xử lý.
-            Chúng tôi sẽ thông báo qua email khi đơn hàng sẵn sàng.
+            {isPaid
+              ? 'Cảm ơn bạn đã thanh toán. Đơn hàng của bạn đã được xác nhận và đang được xử lý. Chúng tôi sẽ thông báo qua email khi đơn hàng sẵn sàng.'
+              : 'Cảm ơn bạn đã mua hàng. Đơn hàng của bạn đã được tiếp nhận và đang được xử lý. Chúng tôi sẽ thông báo qua email khi đơn hàng sẵn sàng.'}
           </p>
 
-          {/* Order number */}
-          <div className="bg-gray-50 rounded-xl px-8 py-5 mb-8 border border-gray-100">
+          <div className="bg-gray-50 rounded-xl px-8 py-5 mb-4 border border-gray-100">
             <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Mã đơn hàng</p>
-            <p className="text-xl font-bold text-indigo-600 font-mono">{orderId}</p>
+            <p className="text-xl font-bold text-indigo-600 font-mono">{orderCode || '—'}</p>
           </div>
 
-          {/* Actions */}
+          {order && (
+            <div className="grid grid-cols-2 gap-3 mb-8 text-left">
+              <div className="bg-gray-50 rounded-xl px-5 py-4 border border-gray-100">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Tổng tiền</p>
+                <p className="text-base font-semibold text-gray-900">
+                  {formatPrice(order.invoice?.totalAmount ?? order.totalPrice)}
+                </p>
+              </div>
+              <div className="bg-gray-50 rounded-xl px-5 py-4 border border-gray-100">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Số sản phẩm</p>
+                <p className="text-base font-semibold text-gray-900">{order.totalItem ?? order.items?.length ?? 0}</p>
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link
               to={`/orders/${orderId}`}
