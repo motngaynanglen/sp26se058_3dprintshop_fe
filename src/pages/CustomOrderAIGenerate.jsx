@@ -1,160 +1,215 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import img1 from '../components/imgs/1.png';
-import img2 from '../components/imgs/2.png';
+import { notification } from 'antd';
+import GlbPreview from '../components/Mainflow2/GlbPreview';
+import { generateAndUploadGlbFromImage } from '../api/modelApi';
+import { uploadFile, createAiPrintRequest } from '../api/mainflow2Api';
+
+const SpinnerIcon = () => (
+  <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+  </svg>
+);
 
 const CustomOrderAIGenerate = () => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    images: [],
-    prompt: ''
-  });
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
+  const [step, setStep] = useState('generate');
+  const [generating, setGenerating] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [uploadingRef, setUploadingRef] = useState(false);
 
-  const handleImageChange = (e) => {
-    setFormData({
-      ...formData,
-      images: Array.from(e.target.files)
-    });
-  };
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [title, setTitle] = useState('');
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+  const [glbUrl, setGlbUrl] = useState(null);
+  const [sourceImageUrl, setSourceImageUrl] = useState(null);
+
+  const handleImagePick = (file) => {
+    if (!file) return;
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
   };
 
   const handleGenerate = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    
-    // TODO: Call Hunyuan 3D AI API
-    setTimeout(() => {
-      setResult({
-        modelUrl: '/mock-model.stl',
-        preview: 'Generated 3D model preview'
+    if (!imageFile) {
+      notification.warning({ message: 'Chọn ảnh tham khảo cho AI.' });
+      return;
+    }
+    setGenerating(true);
+    try {
+      const { glbUrl: url } = await generateAndUploadGlbFromImage(imageFile);
+      setGlbUrl(url);
+
+      setUploadingRef(true);
+      try {
+        const up = await uploadFile(imageFile);
+        const pub = up?.data?.publicUrl || up?.data?.url || up?.publicUrl;
+        if (pub) setSourceImageUrl(pub);
+      } catch (upErr) {
+        console.warn('Không upload ảnh tham khảo:', upErr);
+      } finally {
+        setUploadingRef(false);
+      }
+
+      setStep('preview');
+      notification.success({
+        message: 'Đã tạo mô hình 3D',
+        description: 'Xem preview và gửi cho kỹ thuật viên báo giá.',
       });
-      setLoading(false);
-    }, 2000);
+    } catch (err) {
+      console.error(err);
+      notification.error({
+        message: 'Tạo mô hình thất bại',
+        description: err?.response?.data?.message || err?.response?.data?.data || err.message,
+      });
+    } finally {
+      setGenerating(false);
+    }
   };
 
-  const handleUseResult = () => {
-    // TODO: Save result and proceed
-    navigate('/my-custom-orders');
+  const handleSubmitForQuote = async () => {
+    if (!glbUrl) {
+      notification.warning({ message: 'Chưa có file GLB.' });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await createAiPrintRequest({
+        title: title.trim() || undefined,
+        modelFileUrl: glbUrl,
+        sourceImageUrl: sourceImageUrl || undefined,
+      });
+      const designWorkId = res?.data ?? res;
+      if (!designWorkId || typeof designWorkId === 'object') {
+        throw new Error('Không nhận được mã yêu cầu từ server.');
+      }
+      notification.success({
+        message: 'Đã gửi yêu cầu báo giá',
+        description: 'KTV sẽ xem GLB, báo giá in — bạn chat & duyệt giá như đơn custom khác.',
+      });
+      navigate(`/custom-orders/${designWorkId}`);
+    } catch (err) {
+      console.error(err);
+      notification.error({
+        message: 'Gửi yêu cầu thất bại',
+        description: err?.response?.data?.message || err?.response?.data?.data || err.message,
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <div className="max-w-4xl mx-auto px-8 py-8">
-      <h1 className="text-3xl font-bold mb-8 text-gray-800">AI Tạo Mẫu 3D</h1>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-800 mb-1">AI tạo mẫu 3D (Flow 3)</h1>
+        <p className="text-sm text-gray-500">
+          Upload 1 ảnh → AI sinh GLB → kỹ thuật viên báo giá in → thanh toán → sản xuất & giao hàng (giống flow 2).
+        </p>
+      </div>
 
-      {!result ? (
-        <form onSubmit={handleGenerate} className="bg-white rounded-lg shadow-md p-8">
-          <div className="mb-6">
-            <label className="block mb-2 font-medium text-gray-800">Đăng tải Hình ảnh</label>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-indigo-600 transition-colors">
+      {step === 'generate' && (
+        <form onSubmit={handleGenerate} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 space-y-6">
+          <div>
+            <label className="block mb-2 font-medium text-gray-800">Ảnh tham khảo</label>
+            <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-violet-500 transition-colors">
               <input
                 type="file"
                 accept="image/*"
-                multiple
-                onChange={handleImageChange}
-                required
                 className="hidden"
-                id="ai-image-upload"
+                id="ai-image"
+                onChange={(e) => handleImagePick(e.target.files?.[0])}
               />
-              <label htmlFor="ai-image-upload" className="cursor-pointer">
-                <div className="text-4xl mb-4">🤖</div>
-                <p className="text-gray-600">
-                  {formData.images.length > 0 
-                    ? `Đã chọn ${formData.images.length} ảnh`
-                    : 'Nhấn để tải lên ảnh cho AI xử lý'}
-                </p>
-                <p className="text-sm text-gray-500 mt-2">Tải lên một hoặc nhiều ảnh tham khảo</p>
+              <label htmlFor="ai-image" className="cursor-pointer block">
+                {imagePreview ? (
+                  <img src={imagePreview} alt="Tham khảo" className="mx-auto max-h-48 rounded-lg object-contain" />
+                ) : (
+                  <>
+                    <div className="text-4xl mb-3">🤖</div>
+                    <p className="text-gray-600">Chọn ảnh để AI tạo mô hình 3D</p>
+                  </>
+                )}
               </label>
             </div>
-            {formData.images.length > 0 && (
-              <div className="mt-4 grid grid-cols-4 gap-4">
-                {formData.images.map((img, idx) => (
-                  <div key={idx} className="bg-gray-200 h-24 rounded overflow-hidden">
-                    <img 
-                      src={idx % 2 === 0 ? img1 : img2} 
-                      alt={img.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
 
-          <div className="mb-6">
-            <label className="block mb-2 font-medium text-gray-800">Mô tả thêm (Tùy chọn)</label>
-            <textarea
-              name="prompt"
-              value={formData.prompt}
-              onChange={handleChange}
-              rows="4"
-              className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:border-indigo-600"
-              placeholder="Thêm hướng dẫn hoặc yêu cầu cụ thể cho việc tạo mẫu AI..."
-            />
-          </div>
-
-          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
-            <p className="text-sm text-purple-800">
-              <strong>Quy trình AI:</strong> AI sẽ phân tích hình ảnh của bạn và tạo ra một mô hình 3D nguyên mẫu. 
-              Đây là bản xem trước nhanh - bạn có thể yêu cầu chỉnh sửa hoặc tiến hành đặt in với mẫu này.
-            </p>
+          <div className="bg-violet-50 border border-violet-100 rounded-xl p-4 text-sm text-violet-900">
+            <p className="font-semibold mb-1">Sau khi có GLB:</p>
+            <p>KTV xem file, báo giá chi tiết (vật liệu, gram, tiền công). Bạn duyệt → thanh toán → in 3D & GHN.</p>
           </div>
 
           <div className="flex gap-4">
             <button
               type="submit"
-              disabled={loading}
-              className="flex-1 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={generating || !imageFile}
+              className="flex-1 inline-flex items-center justify-center py-3 rounded-xl font-semibold bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50"
             >
-              {loading ? 'Đang tạo...' : 'Tạo Mô hình 3D'}
+              {generating ? <><SpinnerIcon /> Đang tạo GLB & lưu lên server...</> : 'Tạo mô hình 3D'}
             </button>
             <button
               type="button"
               onClick={() => navigate('/custom-order')}
-              className="px-6 py-3 bg-gray-200 text-gray-800 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+              className="px-6 py-3 bg-gray-100 rounded-xl font-semibold"
             >
-              Hủy bỏ
+              Hủy
             </button>
           </div>
         </form>
-      ) : (
-        <div className="bg-white rounded-lg shadow-md p-8">
-          <h2 className="text-2xl font-bold mb-6 text-gray-800">Mô hình 3D đã tạo</h2>
-          
-          <div className="bg-gray-200 h-96 rounded-lg mb-6 overflow-hidden">
-            <img 
-              src={img1} 
-              alt="Generated 3D Model Preview"
-              className="w-full h-full object-cover"
+      )}
+
+      {step === 'preview' && glbUrl && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 space-y-6">
+          <h2 className="text-xl font-bold text-gray-800">Preview mô hình AI</h2>
+          <GlbPreview src={glbUrl} height={360} style={{ borderRadius: 12 }} />
+          <p className="text-xs text-gray-500 break-all">
+            GLB: <a href={glbUrl} target="_blank" rel="noreferrer" className="text-violet-600">{glbUrl}</a>
+          </p>
+
+          <div>
+            <label className="block mb-2 font-medium text-gray-800">Tên dự án (tuỳ chọn)</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full p-3 border border-gray-200 rounded-xl"
+              placeholder="VD: Móc khóa AI"
             />
           </div>
 
-          <div className="flex gap-4">
+          <div className="flex flex-wrap gap-4">
             <button
-              onClick={handleUseResult}
-              className="flex-1 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
+              type="button"
+              disabled={submitting || uploadingRef}
+              onClick={handleSubmitForQuote}
+              className="flex-1 min-w-[200px] py-3 rounded-xl font-semibold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 inline-flex items-center justify-center"
             >
-              Sử dụng mẫu này
+              {submitting ? <><SpinnerIcon /> Đang gửi...</> : 'Gửi KTV báo giá'}
             </button>
             <button
-              onClick={() => setResult(null)}
-              className="px-6 py-3 bg-gray-200 text-gray-800 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+              type="button"
+              onClick={() => { setStep('generate'); setGlbUrl(null); }}
+              className="px-6 py-3 bg-gray-100 rounded-xl font-semibold"
             >
               Tạo lại
             </button>
           </div>
         </div>
       )}
+
+      <div className="mt-6 rounded-2xl bg-indigo-50 border border-indigo-100 p-5 text-sm text-indigo-900">
+        <p className="font-semibold mb-1">Quy trình Flow 3:</p>
+        <ol className="list-decimal pl-5 space-y-1">
+          <li>AI tạo GLB từ ảnh bạn upload.</li>
+          <li>KTV tiếp nhận, báo giá từ file GLB (chat nếu cần).</li>
+          <li>Bạn duyệt giá → thanh toán online (VNPay hoặc COD).</li>
+          <li>In 3D → giao hàng GHN (theo dõi như flow 2).</li>
+        </ol>
+      </div>
     </div>
   );
 };
 
 export default CustomOrderAIGenerate;
-

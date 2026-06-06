@@ -1,30 +1,51 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { message } from 'antd';
-import { createDesignRequest } from '../api/mainflow2Api';
-import img1 from '../components/imgs/1.png';
-import img2 from '../components/imgs/2.png';
+import { createDesignRequest, uploadFile } from '../api/mainflow2Api';
+
+const createImageId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
 const CustomOrderRequestDesign = () => {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pendingImages, setPendingImages] = useState([]);
   const [formData, setFormData] = useState({
     title: '',
-    images: [],
-    description: ''
+    description: '',
   });
 
+  useEffect(() => {
+    return () => {
+      pendingImages.forEach((img) => URL.revokeObjectURL(img.previewUrl));
+    };
+  }, [pendingImages]);
+
   const handleImageChange = (e) => {
-    setFormData({
-      ...formData,
-      images: Array.from(e.target.files)
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const newItems = files.map((file) => ({
+      id: createImageId(),
+      file,
+      previewUrl: URL.createObjectURL(file),
+    }));
+
+    setPendingImages((prev) => [...prev, ...newItems]);
+    e.target.value = '';
+  };
+
+  const handleRemoveImage = (id) => {
+    setPendingImages((prev) => {
+      const item = prev.find((img) => img.id === id);
+      if (item) URL.revokeObjectURL(item.previewUrl);
+      return prev.filter((img) => img.id !== id);
     });
   };
 
   const handleChange = (e) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     });
   };
 
@@ -35,29 +56,46 @@ const CustomOrderRequestDesign = () => {
       return;
     }
 
+    if (pendingImages.length === 0) {
+      message.warning('Vui lòng thêm ít nhất một hình ảnh tham khảo!');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
-      // Giả lập upload ảnh lấy URL thật, ở đây truyền url tượng trưng
-      const mockImageUrls = formData.images.length > 0 
-        ? formData.images.map(img => `https://mock.com/${img.name}`)
-        : [];
+
+      const imageUrls = [];
+      for (const { file } of pendingImages) {
+        const res = await uploadFile(file);
+        const data = res?.data || res;
+        const publicUrl = data?.publicUrl || data?.url;
+        if (!publicUrl) throw new Error(`Không lấy được URL cho ${file.name}`);
+        imageUrls.push(publicUrl);
+      }
 
       const payload = {
         title: formData.title,
         requirementBrief: formData.description,
-        initialIdeaImageUrls: mockImageUrls
+        initialIdeaImageUrls: imageUrls,
       };
 
       const res = await createDesignRequest(payload);
       if (res && res.statusCode === 200) {
         message.success('Yêu cầu thiết kế đã được gửi!');
-        navigate('/my-custom-orders');
+        const newId = res?.data;
+        if (newId && typeof newId === 'string') {
+          navigate(`/custom-orders/${newId}`);
+        } else {
+          navigate('/my-custom-orders');
+        }
       } else {
         message.error(res?.message || 'Có lỗi xảy ra khi tạo yêu cầu!');
       }
     } catch (error) {
       console.error(error);
-      message.error('Có lỗi xảy ra, vui lòng thử lại sau.');
+      message.error(
+        error?.response?.data?.message || error.message || 'Có lỗi xảy ra, vui lòng thử lại sau.',
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -89,29 +127,40 @@ const CustomOrderRequestDesign = () => {
               accept="image/*"
               multiple
               onChange={handleImageChange}
-              required
+              disabled={isSubmitting}
               className="hidden"
               id="image-upload"
             />
             <label htmlFor="image-upload" className="cursor-pointer">
               <div className="text-4xl mb-4">🖼️</div>
               <p className="text-gray-600">
-                {formData.images.length > 0 
-                  ? `Đã chọn ${formData.images.length} ảnh`
-                  : 'Nhấn để tải lên hình ảnh tham khảo (có thể chọn nhiều ảnh)'}
+                {pendingImages.length > 0
+                  ? `Đã chọn ${pendingImages.length} ảnh — nhấn để thêm ảnh`
+                  : 'Nhấn để chọn hình ảnh tham khảo (có thể chọn nhiều ảnh)'}
               </p>
-              <p className="text-sm text-gray-500 mt-2">Đội ngũ kỹ thuật sẽ dựa vào ảnh này để thiết kế</p>
+              <p className="text-sm text-gray-500 mt-2">
+                Ảnh sẽ được tải lên khi bạn nhấn &quot;Gửi yêu cầu&quot;
+              </p>
             </label>
           </div>
-          {formData.images.length > 0 && (
-            <div className="mt-4 grid grid-cols-4 gap-4">
-              {formData.images.map((img, idx) => (
-                <div key={idx} className="bg-gray-200 h-24 rounded overflow-hidden">
-                  <img 
-                    src={idx % 2 === 0 ? img1 : img2} 
-                    alt={img.name}
+          {pendingImages.length > 0 && (
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {pendingImages.map((img) => (
+                <div key={img.id} className="relative group bg-gray-200 h-24 rounded overflow-hidden">
+                  <img
+                    src={img.previewUrl}
+                    alt={img.file.name}
                     className="w-full h-full object-cover"
                   />
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveImage(img.id)}
+                    disabled={isSubmitting}
+                    className="absolute top-1 right-1 w-6 h-6 flex items-center justify-center rounded-full bg-black/60 text-white text-sm hover:bg-red-600 transition-colors disabled:opacity-50"
+                    aria-label={`Xóa ${img.file.name}`}
+                  >
+                    ×
+                  </button>
                 </div>
               ))}
             </div>
@@ -131,13 +180,6 @@ const CustomOrderRequestDesign = () => {
           />
         </div>
 
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <p className="text-sm text-blue-800">
-            <strong>Lưu ý:</strong> Đội ngũ thiết kế sẽ xem xét yêu cầu của bạn và tạo mô hình 3D dựa trên hình ảnh và mô tả. 
-            Bạn sẽ nhận được thông báo qua Zalo khi file xem trước sẵn sàng để duyệt.
-          </p>
-        </div>
-
         <div className="flex gap-4">
           <button
             type="submit"
@@ -146,12 +188,13 @@ const CustomOrderRequestDesign = () => {
               isSubmitting ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'
             }`}
           >
-            {isSubmitting ? 'Đang gửi...' : 'Gửi yêu cầu'}
+            {isSubmitting ? 'Đang gửi yêu cầu...' : 'Gửi yêu cầu'}
           </button>
           <button
             type="button"
             onClick={() => navigate('/custom-order')}
-            className="px-6 py-3 bg-gray-200 text-gray-800 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+            disabled={isSubmitting}
+            className="px-6 py-3 bg-gray-200 text-gray-800 rounded-lg font-semibold hover:bg-gray-300 transition-colors disabled:opacity-50"
           >
             Hủy bỏ
           </button>
@@ -162,4 +205,3 @@ const CustomOrderRequestDesign = () => {
 };
 
 export default CustomOrderRequestDesign;
-

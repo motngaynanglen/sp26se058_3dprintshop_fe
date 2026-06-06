@@ -1,32 +1,30 @@
-import React, { createContext, useState, useContext } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 
-const AuthModalContext = createContext();
+const AuthModalContext = createContext(null);
 
 export const useAuthModal = () => {
-  const context = useContext(AuthModalContext);
-  if (!context) {
-    throw new Error('useAuthModal must be used within an AuthModalProvider');
+  const ctx = useContext(AuthModalContext);
+  if (!ctx) {
+    throw new Error('useAuthModal must be used within AuthModalProvider');
   }
-  return context;
+  return ctx;
 };
 
 export const AuthModalProvider = ({ children }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [mode, setMode] = useState('login'); // 'login' or 'register'
+  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState('login');
 
-  const openModal = (modalMode = 'login') => {
-    setMode(modalMode);
-    setIsOpen(true);
-  };
+  const openModal = useCallback((nextMode = 'login') => {
+    setMode(nextMode === 'register' ? 'register' : 'login');
+    setOpen(true);
+  }, []);
 
-  const closeModal = () => {
-    setIsOpen(false);
-  };
+  const closeModal = useCallback(() => setOpen(false), []);
 
-  return (
-    <AuthModalContext.Provider value={{ isOpen, mode, openModal, closeModal }}>
-      {children}
-    </AuthModalContext.Provider>
+  const value = useMemo(
+    () => ({ open, mode, setMode, openModal, closeModal }),
+    [open, mode, openModal, closeModal]
   );
-};
 
+  return <AuthModalContext.Provider value={value}>{children}</AuthModalContext.Provider>;
+};
