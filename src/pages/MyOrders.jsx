@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Spin } from 'antd';
+import { formatDistanceToNow } from 'date-fns';
+import { vi } from 'date-fns/locale';
 import { queryOrdersApi } from '../api/orderApi';
 
 // SVG Icons
@@ -93,14 +95,12 @@ const FILTER_TABS = [
   { value: 'cancelled', label: 'Đã hủy', status: 'CANCELLED' },
 ];
 
-const formatDate = (dateStr) => {
+const formatRelativeDate = (dateStr) => {
   if (!dateStr) return '—';
   try {
-    return new Intl.DateTimeFormat('vi-VN', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-    }).format(new Date(dateStr));
+    return formatDistanceToNow(new Date(dateStr), { addSuffix: true, locale: vi });
   } catch {
-    return dateStr;
+    return '—';
   }
 };
 
@@ -127,31 +127,21 @@ const MyOrders = () => {
         priority: null,
         sortDescending: true,
         sortBy: 'created',
-        paging: {
-          pageNumber: page,
-          pageSize: 10,
-        },
+        pageNumber: page,
+        pageSize: 10,
       };
 
       const response = await queryOrdersApi(payload);
-      console.log('Orders query response:', response);
+      const items = Array.isArray(response?.data) ? response.data : [];
+      const paging = response?.additionalData?.paging || {};
 
-      const data = response?.data || response;
-
-      // Response có thể là { items: [...], totalCount, pageNumber, ... } hoặc array trực tiếp
-      if (Array.isArray(data)) {
-        setOrders(data);
-        setPagination({ pageNumber: 1, pageSize: 10, totalCount: data.length, totalPages: 1 });
-      } else {
-        const items = data?.items || data?.data || [];
-        setOrders(Array.isArray(items) ? items : []);
-        setPagination({
-          pageNumber: data?.pageNumber || data?.paging?.pageNumber || page,
-          pageSize: data?.pageSize || data?.paging?.pageSize || 10,
-          totalCount: data?.totalCount || data?.total || items.length,
-          totalPages: data?.totalPages || Math.ceil((data?.totalCount || items.length) / 10),
-        });
-      }
+      setOrders(items);
+      setPagination({
+        pageNumber: paging.pageNumber || page,
+        pageSize: paging.pageSize || 10,
+        totalCount: paging.totalCount ?? items.length,
+        totalPages: paging.totalPages || Math.ceil((paging.totalCount ?? items.length) / 10) || 1,
+      });
     } catch (err) {
       console.error('Failed to fetch orders:', err);
       setError(err?.response?.data?.message || err?.response?.data?.title || 'Không thể tải danh sách đơn hàng.');
@@ -253,7 +243,7 @@ const MyOrders = () => {
                   const orderCode = order.code || order.orderCode || orderId;
                   const orderDate = order.createdAt || order.created || order.date;
                   const orderStatus = order.status || order.orderStatus || 'CREATED';
-                  const orderTotal = order.totalAmount || order.total || 0;
+                  const orderTotal = order.totalPrice ?? order.totalAmount ?? order.total ?? 0;
                   const orderSourceType = order.sourceType || 'IN_STOCK';
 
                   return (
@@ -261,7 +251,9 @@ const MyOrders = () => {
                       <td className="px-6 py-4">
                         <span className="text-sm font-mono font-semibold text-gray-800">{orderCode}</span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{formatDate(orderDate)}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600" title={orderDate ? new Date(orderDate).toLocaleString('vi-VN') : undefined}>
+                        {formatRelativeDate(orderDate)}
+                      </td>
                       <td className="px-6 py-4"><SourceTypeBadge sourceType={orderSourceType} /></td>
                       <td className="px-6 py-4"><StatusBadge status={orderStatus} /></td>
                       <td className="px-6 py-4 text-sm font-bold text-gray-900">{formatPrice(orderTotal)}</td>

@@ -1,261 +1,316 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { getProductById } from '../data/products';
+import { useCart } from '../contexts/CartContext';
+import designVariantApi from '../api/designVariantApi';
+import { normalizeVariant, formatPrice, formatStockLabel, getPreOrderQuantity, needsAdditionalPrinting } from '../utils/catalogProduct';
 import {
   Button,
   InputNumber,
-  Select,
   Breadcrumb,
-  Rate,
   Divider,
   Tag,
   Space,
   Card,
   Row,
   Col,
-  Image,
-  Tooltip,
-  notification
+  Spin,
+  Result,
+  notification,
+  Alert,
 } from 'antd';
 import {
   ArrowLeftOutlined,
   ShoppingOutlined,
+  ShoppingCartOutlined,
   EyeOutlined,
   InfoCircleOutlined,
-  CheckCircleOutlined
+  CheckCircleOutlined,
 } from '@ant-design/icons';
-import '@google/model-viewer';
-
-const { Option } = Select;
+import FeedbackCommentsList from '../components/Feedback/FeedbackCommentsList';
+import ProductModelViewer from '../components/catalog/ProductModelViewer';
 
 const ProductDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const location = useLocation();
-  const { isAuthenticated, isCustomer, isManager, isAdmin, isEmployee } = useAuth();
+  const { isAuthenticated, isCustomer } = useAuth();
+  const { addToCart } = useCart();
 
-  
   const [product, setProduct] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
   const [quantity, setQuantity] = useState(1);
-  const [selectedMaterial, setSelectedMaterial] = useState('PLA');
-
-  // Detect if came from specific page
-  const fromFeedback = location.state?.from === 'feedback';
-  const previousPath = location.state?.previousPath || '/products';
 
   useEffect(() => {
-    const foundProduct = getProductById(id);
-    if (foundProduct) {
-      setProduct(foundProduct);
-      if (foundProduct.materials?.length > 0) {
-        setSelectedMaterial(foundProduct.materials[0]);
+    let cancelled = false;
+
+    const load = async () => {
+      setLoading(true);
+      setNotFound(false);
+      try {
+        const res = await designVariantApi.getDetail(id);
+        const raw = res?.data;
+        if (!raw) {
+          if (!cancelled) setNotFound(true);
+          return;
+        }
+        if (!cancelled) {
+          setProduct(normalizeVariant(raw));
+          setQuantity(1);
+        }
+      } catch (err) {
+        console.error('Product detail load error:', err);
+        if (!cancelled) setNotFound(true);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    } else {
-      // Handle not found (could redirect or show skeleton)
-    }
+    };
+
+    if (id) load();
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
-  const handleGoBack = () => {
-    if (fromFeedback) {
-      navigate('/manager/feedback');
-    } else if (window.history.length > 1) {
-      navigate(-1);
-    } else {
-      navigate('/products');
-    }
-  };
+  const buildCartItem = () => ({
+    variantId: product.id != null ? String(product.id) : undefined,
+    name: product.name,
+    designTemplateName: product.designTemplateName,
+    price: product.price,
+    quantity,
+    material: product.material,
+    modelSrc: product.modelSrc,
+    stock: product.stock,
+    isAllowPreOrder: product.isAllowPreOrder,
+    sourceType: 'IN_STOCK',
+  });
 
   const handleBuyNow = () => {
     if (!isAuthenticated) {
+      notification.info({ message: 'Vui lòng đăng nhập để mua hàng' });
       navigate('/login');
       return;
     }
-    navigate('/checkout', {
-      state: {
-        product,
-        quantity,
-        material: selectedMaterial,
-      }
-    });
+    navigate('/checkout', { state: { cartItems: [buildCartItem()] } });
   };
 
-  // Determine if should show Buy Now
+  const handleAddToCart = () => {
+    addToCart(
+      {
+        id: product.id,
+        name: product.name,
+        designTemplateName: product.designTemplateName,
+        price: product.price,
+        modelSrc: product.modelSrc,
+        sourceType: product.stock > 0 ? 'in_stock' : 'pre_order',
+        stock: product.stock,
+        isAllowPreOrder: product.isAllowPreOrder,
+        materials: [product.material],
+      },
+      product.material,
+      quantity
+    );
+    notification.success({ message: 'Đã thêm vào giỏ hàng' });
+  };
+
+  const outOfStock = product && product.stock <= 0;
+  const canOrder = product && (product.stock > 0 || product.isAllowPreOrder);
+  const preOrderQty = product ? getPreOrderQuantity(quantity, product.stock) : 0;
+  const showPreOrderNote = product && needsAdditionalPrinting(quantity, product.stock, product.isAllowPreOrder);
+  const maxQuantity = product
+    ? (product.isAllowPreOrder ? 99 : Math.max(product.stock, 1))
+    : 1;
   const showBuyNow = isCustomer;
 
-  if (!product) {
-    return <div className="min-h-screen flex items-center justify-center font-medium text-slate-500">Đang tải dữ liệu sản phẩm...</div>;
+  if (loading) {
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center">
+        <Spin size="large" tip="Đang tải sản phẩm..." />
+      </div>
+    );
   }
+
+  if (notFound || !product) {
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center p-6">
+        <Result
+          status="404"
+          title="Không tìm thấy sản phẩm"
+          subTitle="Sản phẩm có thể đã ngừng bán hoặc liên kết không hợp lệ."
+          extra={
+            <Button type="primary" onClick={() => navigate('/products')}>
+              Về danh sách sản phẩm
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
+  const displayName = product.designTemplateName
+    ? `${product.designTemplateName} — ${product.name}`
+    : product.name;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Back Button & Breadcrumb */}
         <div className="mb-6">
-
+          <Button
+            type="text"
+            icon={<ArrowLeftOutlined />}
+            onClick={() => navigate(-1)}
+            className="mb-2"
+          >
+            Quay lại
+          </Button>
           <Breadcrumb
             items={[
-              { title: <a href="/">Trang chủ</a> },
-              { title: <a href="/products">Sản phẩm</a> },
-              { title: product.name }
+              { title: <Link to="/">Trang chủ</Link> },
+              { title: <Link to="/products">Sản phẩm</Link> },
+              { title: displayName },
             ]}
           />
         </div>
 
-        {/* Main Product Section */}
         <Card className="mb-6">
           <Row gutter={[32, 32]}>
-            {/* Image Gallery - Sticky & Enhanced */}
             <Col xs={24} lg={12}>
               <div className="sticky top-24">
-                {/* Switch between 3D Model and Image */}
                 <div className="mb-4 overflow-hidden rounded-xl border border-gray-200 bg-slate-50 relative aspect-square w-full">
-                  {product.modelSrc ? (
-                    <model-viewer
-                      src={product.modelSrc}
-                      camera-controls
-                      auto-rotate
-                      shadow-intensity="1"
-                      environment-image="neutral"
-                      exposure="1.2"
-                      style={{ width: '100%', height: '100%', backgroundColor: '#f8fafc' }}
-                    />
-                  ) : (
-                    <Image
-                      src={activeImage || product.images?.[0]}
-                      alt={product.name}
-                      className="w-full h-full object-contain"
-                      preview={{ src: activeImage || product.images?.[0] }}
-                    />
-                  )}
-                  {product.modelSrc && (
-                    <div className="absolute top-3 right-3 bg-indigo-600 text-white text-[11px] font-semibold px-2 py-1 rounded-full shadow-sm">
-                      3D Interactive
-                    </div>
-                  )}
+                  <ProductModelViewer
+                    className="absolute inset-0"
+                    src={product.modelSrc}
+                    fallbackId={product.id}
+                    poster={product.thumbnailUrl}
+                  />
+                  <div className="absolute top-3 right-3 z-10 bg-indigo-600 text-white text-[11px] font-semibold px-2 py-1 rounded-full shadow-sm pointer-events-none">
+                    3D Interactive
+                  </div>
                 </div>
               </div>
             </Col>
 
-            {/* Product Info */}
             <Col xs={24} lg={12}>
               <div>
-                {/* Title & Rating */}
-                <h1 className="text-3xl font-bold text-gray-900 mb-3">
-                  {product.name}
-                </h1>
+                <h1 className="text-3xl font-bold text-gray-900 mb-3 m-0">{displayName}</h1>
+                {product.code && (
+                  <p className="text-sm text-slate-500 mb-3 m-0">Mã: {product.code}</p>
+                )}
 
-                <div className="flex items-center gap-3 mb-4">
-                  <Rate disabled value={product.rating} allowHalf />
-                  <span className="text-gray-600">
-                    {product.rating} ({product.reviewCount} đánh giá)
-                  </span>
-                </div>
-
-                {/* Price */}
                 <div className="mb-6">
-                  <span className="text-4xl font-bold text-indigo-600">
-                    {product.price.toLocaleString('vi-VN')} đ
-                  </span>
+                  <span className="text-4xl font-bold text-indigo-600">{formatPrice(product.price)}</span>
                 </div>
 
-                {/* Description */}
-                <div className="mb-6">
-                  <p className="text-gray-700 leading-relaxed">
-                    {product.description}
-                  </p>
-                </div>
+                {product.description && (
+                  <div className="mb-6">
+                    <p className="text-gray-700 leading-relaxed m-0">{product.description}</p>
+                  </div>
+                )}
 
                 <Divider />
 
-                {/* Material Selection */}
                 <div className="mb-6">
-                  <label className="block mb-2 font-semibold text-gray-800">
-                    Chất liệu
-                  </label>
-                  <Select
-                    value={selectedMaterial}
-                    onChange={setSelectedMaterial}
-                    size="large"
-                    style={{ width: '100%' }}
-                  >
-                    {product.materials.map(material => (
-                      <Option key={material} value={material}>
-                        {material}
-                      </Option>
-                    ))}
-                  </Select>
+                  <label className="block mb-2 font-semibold text-gray-800">Chất liệu</label>
+                  <Tag color="blue" className="text-sm px-3 py-1">
+                    {product.material}
+                  </Tag>
                 </div>
 
-                {/* Quantity Selection */}
                 <div className="mb-6">
-                  <label className="block mb-2 font-semibold text-gray-800">
-                    Số lượng
-                  </label>
-                  <div className="flex items-center gap-4">
+                  <label className="block mb-2 font-semibold text-gray-800">Số lượng</label>
+                  <div className="flex items-center gap-4 flex-wrap">
                     <InputNumber
                       min={1}
-                      max={product.stock}
+                      max={maxQuantity}
                       value={quantity}
-                      onChange={setQuantity}
+                      onChange={(v) => setQuantity(v || 1)}
                       size="large"
                       style={{ width: 120 }}
                     />
-                    <Tag color={product.stock > 5 ? 'success' : 'warning'} icon={<CheckCircleOutlined />}>
-                      Còn {product.stock} sản phẩm
+                    <Tag
+                      color={product.stock > 5 ? 'success' : product.stock > 0 ? 'warning' : 'default'}
+                      icon={<CheckCircleOutlined />}
+                    >
+                      {outOfStock
+                        ? (product.isAllowPreOrder ? 'Hết hàng — đặt trước' : 'Hết hàng')
+                        : formatStockLabel(product.stock)}
                     </Tag>
                   </div>
+                  {showPreOrderNote && (
+                    <Alert
+                      type="warning"
+                      showIcon
+                      className="mt-3"
+                      message="Một phần sản phẩm cần in thêm"
+                      description={
+                        product.stock > 0
+                          ? `Kho còn ${product.stock} sản phẩm. ${preOrderQty} sản phẩm sẽ được in thêm sau khi đặt hàng — thời gian nhận hàng có thể lâu hơn bình thường.`
+                          : `Toàn bộ ${quantity} sản phẩm sẽ được in thêm sau khi đặt hàng — thời gian nhận hàng có thể lâu hơn bình thường.`
+                      }
+                    />
+                  )}
                 </div>
 
                 <Divider />
 
-                {/* Action Buttons */}
                 <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-                  {/* Buy Now - Only for Customers */}
                   {showBuyNow && (
-                    <Button
-                      type="primary"
-                      size="large"
-                      icon={<ShoppingOutlined />}
-                      onClick={handleBuyNow}
-                      block
-                      style={{ height: 50 }}
-                    >
-                      Mua hàng
-                    </Button>
+                    <>
+                      <Button
+                        type="primary"
+                        size="large"
+                        icon={<ShoppingOutlined />}
+                        onClick={handleBuyNow}
+                        disabled={!canOrder}
+                        block
+                        style={{ height: 50 }}
+                      >
+                        Mua ngay
+                      </Button>
+                      <Button
+                        size="large"
+                        icon={<ShoppingCartOutlined />}
+                        onClick={handleAddToCart}
+                        disabled={!canOrder}
+                        block
+                        style={{ height: 50 }}
+                      >
+                        Thêm vào giỏ
+                      </Button>
+                    </>
                   )}
 
-                  {/* View 3D Preview - For All */}
                   <Button
                     size="large"
                     icon={<EyeOutlined />}
-                    onClick={() => navigate(`/preview/${id}`, {
-                      state: {
-                        breadcrumb: [
-                          { title: 'Trang chủ', path: '/' },
-                          { title: 'Sản phẩm', path: '/products' },
-                          { title: product.name, path: `/products/${id}` },
-                          { title: 'Xem mô hình 3D', path: null }
-                        ]
-                      }
-                    })}
+                    onClick={() =>
+                      navigate(`/preview/${id}`, {
+                        state: {
+                          modelSrc: product.modelSrc,
+                          productName: displayName,
+                          breadcrumb: [
+                            { title: 'Trang chủ', path: '/' },
+                            { title: 'Sản phẩm', path: '/products' },
+                            { title: displayName, path: `/products/${id}` },
+                            { title: 'Xem mô hình 3D', path: null },
+                          ],
+                        },
+                      })
+                    }
                     block
                     style={{ height: 50 }}
                   >
-                    Xem mô hình 3D
+                    Xem toàn màn hình 3D
                   </Button>
 
-                  {/* Info for non-customers */}
                   {!showBuyNow && (
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                       <div className="flex items-start gap-3">
                         <InfoCircleOutlined className="text-blue-600 text-xl mt-1" />
                         <div>
-                          <div className="font-semibold text-blue-900 mb-1">
-                            Thông tin dành cho {isManager ? 'Manager' : isAdmin ? 'Admin' : 'Nhân viên'}
-                          </div>
+                          <div className="font-semibold text-blue-900 mb-1">Tài khoản quản trị</div>
                           <div className="text-sm text-blue-700">
-                            Bạn đang xem trang này với quyền quản trị. Chức năng mua hàng chỉ dành cho khách hàng.
+                            Chức năng mua hàng chỉ dành cho khách hàng. Vui lòng đăng nhập tài khoản Customer.
                           </div>
                         </div>
                       </div>
@@ -267,43 +322,12 @@ const ProductDetail = () => {
           </Row>
         </Card>
 
-        {/* Product Details Tabs */}
-        <Row gutter={[16, 16]}>
-          {/* Specifications */}
-          <Col xs={24} lg={12}>
-            <Card title="Thông số kỹ thuật" className="h-full">
-              <div className="space-y-3">
-                {Object.entries(product.specifications).map(([key, value]) => (
-                  <div key={key} className="flex justify-between py-2 border-b border-gray-100">
-                    <span className="text-gray-600 capitalize">
-                      {key === 'dimensions' ? 'Kích thước' :
-                       key === 'weight' ? 'Trọng lượng' :
-                       key === 'printTime' ? 'Thời gian in' :
-                       key === 'layerHeight' ? 'Độ cao lớp' :
-                       key === 'infill' ? 'Độ đặc' :
-                       key === 'color' ? 'Màu sắc' : key}:
-                    </span>
-                    <span className="font-semibold text-gray-900">{value}</span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </Col>
-
-          {/* Features */}
-          <Col xs={24} lg={12}>
-            <Card title="Đặc điểm nổi bật" className="h-full">
-              <ul className="space-y-3">
-                {product.features.map((feature, idx) => (
-                  <li key={idx} className="flex items-start gap-3">
-                    <CheckCircleOutlined className="text-green-500 text-lg mt-1" />
-                    <span className="text-gray-700">{feature}</span>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          </Col>
-        </Row>
+        {product.designTemplateId && (
+          <FeedbackCommentsList
+            templateId={product.designTemplateId}
+            title="Đánh giá & nhận xét"
+          />
+        )}
       </div>
     </div>
   );

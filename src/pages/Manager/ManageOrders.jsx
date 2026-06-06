@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Table, Button, Input, Select, Modal, Card, Row, Col, Tag, Space,
   Typography, message, Empty, Descriptions, Divider, Badge, Tooltip
@@ -9,6 +10,9 @@ import {
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { queryOrdersApi, getOrderDetailApi, cancelOrderApi } from '../../api/orderApi';
+import StaffCarrierActions from '../../components/Shipping/StaffCarrierActions';
+import { normalizeOrderRow, normalizeOrderDetail } from '../../utils/orderNormalize';
+import { formatVnd } from '../../utils/formatters';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -18,6 +22,7 @@ const ORDER_STATUSES = [
   { value: 'PENDING', label: 'Chờ xác nhận', color: 'orange' },
   { value: 'CONFIRMED', label: 'Đã xác nhận', color: 'blue' },
   { value: 'PROCESSING', label: 'Đang xử lý', color: 'cyan' },
+  { value: 'FINISHED', label: 'Sẵn sàng giao', color: 'geekblue' },
   { value: 'SHIPPING', label: 'Đang giao', color: 'purple' },
   { value: 'DELIVERED', label: 'Đã giao', color: 'green' },
   { value: 'CANCELLED', label: 'Đã hủy', color: 'red' },
@@ -28,7 +33,15 @@ const statusMap = Object.fromEntries(ORDER_STATUSES.map(s => [s.value, s]));
 
 const CANCELLABLE = ['PENDING', 'CONFIRMED'];
 
+const shortCode = (r) => {
+  const c = r?.code || r?.orderCode || r?.id;
+  if (!c) return '—';
+  const s = String(c);
+  return s.length > 12 ? `${s.slice(0, 8)}…` : s;
+};
+
 const ManageOrders = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -40,8 +53,20 @@ const ManageOrders = () => {
   const [detailLoading, setDetailLoading] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
-  useEffect(() => {
-    fetchOrders(1);
+  const openOrderId = searchParams.get('openOrderId');
+
+  const handleViewDetail = useCallback(async (record) => {
+    setIsDetailOpen(true);
+    setDetailLoading(true);
+    try {
+      const res = await getOrderDetailApi(record.id);
+      setSelectedOrder(normalizeOrderDetail(res?.data || res));
+    } catch {
+      message.error('Không thể tải chi tiết đơn hàng');
+      setIsDetailOpen(false);
+    } finally {
+      setDetailLoading(false);
+    }
   }, []);
 
   const fetchOrders = async (page = 1, search = searchTerm, status = filterStatus) => {
@@ -55,7 +80,7 @@ const ManageOrders = () => {
       if (status) params.status = status;
 
       const res = await queryOrdersApi(params);
-      const list = res?.data || [];
+      const list = (res?.data || []).map(normalizeOrderRow).filter(Boolean);
       setOrders(list);
       setPagination(prev => ({
         ...prev,
@@ -69,24 +94,25 @@ const ManageOrders = () => {
     }
   };
 
+  useEffect(() => {
+    fetchOrders(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!openOrderId) return;
+    handleViewDetail({ id: openOrderId });
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('openOrderId');
+      return next;
+    }, { replace: true });
+  }, [openOrderId, handleViewDetail, setSearchParams]);
+
   const handleReset = () => {
     setSearchTerm('');
     setFilterStatus(null);
     fetchOrders(1, '', null);
-  };
-
-  const handleViewDetail = async (record) => {
-    setIsDetailOpen(true);
-    setDetailLoading(true);
-    try {
-      const res = await getOrderDetailApi(record.id);
-      setSelectedOrder(res?.data || res);
-    } catch {
-      message.error('Không thể tải chi tiết đơn hàng');
-      setIsDetailOpen(false);
-    } finally {
-      setDetailLoading(false);
-    }
   };
 
   const handleCancel = (record) => {
@@ -104,7 +130,7 @@ const ManageOrders = () => {
           fetchOrders(pagination.current);
           // Cập nhật detail nếu đang mở
           if (selectedOrder?.id === record.id) {
-            setSelectedOrder(prev => ({ ...prev, status: 'CANCELLED' }));
+            setSelectedOrder((prev) => ({ ...prev, orderStatus: 'CANCELLED', status: 'CANCELLED' }));
           }
         } catch (err) {
           message.error(err?.response?.data?.message || 'Hủy đơn thất bại');
@@ -118,14 +144,15 @@ const ManageOrders = () => {
     return s ? <Tag color={s.color}>{s.label}</Tag> : <Tag>{status}</Tag>;
   };
 
+  const orderStatusOf = (r) => r.orderStatus || r.status;
+
   const columns = [
     {
       title: 'Mã đơn',
-      dataIndex: 'orderCode',
-      key: 'orderCode',
+      key: 'code',
       width: 130,
-      render: (code, record) => (
-        <Text strong className="text-indigo-600">{code || record.id?.slice(0, 8)}</Text>
+      render: (_, record) => (
+        <Text strong className="text-indigo-600">{shortCode(record)}</Text>
       ),
     },
     {
@@ -141,27 +168,27 @@ const ManageOrders = () => {
     },
     {
       title: 'Tổng tiền',
-      dataIndex: 'totalAmount',
-      key: 'totalAmount',
+      dataIndex: 'totalPrice',
+      key: 'totalPrice',
       width: 130,
       align: 'right',
-      render: (val) => (
-        <Text strong>{val?.toLocaleString('vi-VN')} ₫</Text>
-      ),
+      render: (val) => <Text strong>{formatVnd(val)}</Text>,
     },
     {
       title: 'Trạng thái',
-      dataIndex: 'status',
-      key: 'status',
+      key: 'orderStatus',
       width: 140,
-      render: renderStatus,
+      render: (_, r) => renderStatus(orderStatusOf(r)),
     },
     {
       title: 'Ngày tạo',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
+      dataIndex: 'created',
+      key: 'created',
       width: 130,
-      render: (d) => d ? format(new Date(d), 'dd/MM/yyyy HH:mm', { locale: vi }) : '—',
+      render: (d, r) => {
+        const dt = d || r.createdAt;
+        return dt ? format(new Date(dt), 'dd/MM/yyyy HH:mm', { locale: vi }) : '—';
+      },
     },
     {
       title: 'Thao tác',
@@ -173,7 +200,7 @@ const ManageOrders = () => {
           <Tooltip title="Xem chi tiết">
             <Button type="text" icon={<EyeOutlined />} onClick={() => handleViewDetail(record)} />
           </Tooltip>
-          {CANCELLABLE.includes(record.status) && (
+          {CANCELLABLE.includes(orderStatusOf(record)) && (
             <Tooltip title="Hủy đơn">
               <Button type="text" danger icon={<StopOutlined />} onClick={() => handleCancel(record)} />
             </Tooltip>
@@ -249,11 +276,11 @@ const ManageOrders = () => {
 
       {/* Detail Modal */}
       <Modal
-        title={`Chi tiết đơn hàng${selectedOrder?.orderCode ? ` #${selectedOrder.orderCode}` : ''}`}
+        title={`Chi tiết đơn hàng${selectedOrder ? ` #${shortCode(selectedOrder)}` : ''}`}
         open={isDetailOpen}
         onCancel={() => setIsDetailOpen(false)}
         footer={[
-          selectedOrder && CANCELLABLE.includes(selectedOrder.status) && (
+          selectedOrder && CANCELLABLE.includes(orderStatusOf(selectedOrder)) && (
             <Button
               key="cancel"
               danger
@@ -274,10 +301,10 @@ const ManageOrders = () => {
           <div className="mt-2">
             <Descriptions bordered column={2} size="small">
               <Descriptions.Item label="Mã đơn" span={1}>
-                <Text strong>{selectedOrder.orderCode || selectedOrder.id}</Text>
+                <Text strong>{shortCode(selectedOrder)}</Text>
               </Descriptions.Item>
               <Descriptions.Item label="Trạng thái" span={1}>
-                {renderStatus(selectedOrder.status)}
+                {renderStatus(orderStatusOf(selectedOrder))}
               </Descriptions.Item>
               <Descriptions.Item label="Khách hàng" span={1}>
                 {selectedOrder.customerName || '—'}
@@ -290,12 +317,12 @@ const ManageOrders = () => {
               </Descriptions.Item>
               <Descriptions.Item label="Tổng tiền" span={1}>
                 <Text strong className="text-indigo-600">
-                  {selectedOrder.totalAmount?.toLocaleString('vi-VN')} ₫
+                  {formatVnd(selectedOrder.totalPrice ?? selectedOrder.totalAmount)}
                 </Text>
               </Descriptions.Item>
               <Descriptions.Item label="Ngày tạo" span={1}>
-                {selectedOrder.createdAt
-                  ? format(new Date(selectedOrder.createdAt), 'dd/MM/yyyy HH:mm', { locale: vi })
+                {(selectedOrder.created || selectedOrder.createdAt)
+                  ? format(new Date(selectedOrder.created || selectedOrder.createdAt), 'dd/MM/yyyy HH:mm', { locale: vi })
                   : '—'}
               </Descriptions.Item>
               {selectedOrder.note && (
@@ -315,13 +342,57 @@ const ManageOrders = () => {
                   pagination={false}
                   dataSource={selectedOrder.items}
                   columns={[
-                    { title: 'Sản phẩm', dataIndex: 'variantName', render: (name, r) => name || r.designVariantId },
-                    { title: 'SL', dataIndex: 'quantity', width: 60, align: 'center' },
-                    { title: 'Đơn giá', dataIndex: 'price', width: 120, align: 'right', render: v => `${v?.toLocaleString('vi-VN')} ₫` },
-                    { title: 'Thành tiền', width: 130, align: 'right', render: (_, r) => `${(r.price * r.quantity)?.toLocaleString('vi-VN')} ₫` },
+                    {
+                      title: 'Sản phẩm',
+                      dataIndex: 'itemName',
+                      render: (name, r) => name || r.variantName || shortCode(r),
+                    },
+                    {
+                      title: 'SL',
+                      dataIndex: 'quantityOrdered',
+                      width: 60,
+                      align: 'center',
+                      render: (q, r) => q ?? r.quantity ?? 0,
+                    },
+                    {
+                      title: 'Đơn giá',
+                      dataIndex: 'unitPrice',
+                      width: 120,
+                      align: 'right',
+                      render: (v, r) => formatVnd(v ?? r.price),
+                    },
+                    {
+                      title: 'Thành tiền',
+                      width: 130,
+                      align: 'right',
+                      render: (_, r) => formatVnd(r.totalPrice ?? (r.unitPrice ?? r.price) * (r.quantityOrdered ?? r.quantity ?? 1)),
+                    },
+                    {
+                      title: 'SX',
+                      dataIndex: 'fulfillmentStatus',
+                      width: 100,
+                      render: (s) => {
+                        const colors = { PRINTING: 'processing', FINISHED: 'success', PENDING: 'default' };
+                        return <Tag color={colors[s] || 'default'}>{s || '—'}</Tag>;
+                      },
+                    },
                   ]}
                 />
               </>
+            )}
+
+            {selectedOrder?.id && (
+              <StaffCarrierActions
+                orderId={selectedOrder.id}
+                orderStatus={selectedOrder.orderStatus || selectedOrder.status}
+                orderItems={selectedOrder.items || []}
+                onUpdated={async () => {
+                  try {
+                    const res = await getOrderDetailApi(selectedOrder.id);
+                    setSelectedOrder(normalizeOrderDetail(res?.data || res));
+                  } catch { /* ignore */ }
+                }}
+              />
             )}
           </div>
         )}

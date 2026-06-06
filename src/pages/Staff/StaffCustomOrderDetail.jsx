@@ -1,14 +1,22 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { Spin, message, Modal, Input, Button, InputNumber } from "antd";
-import { HubConnectionBuilder, LogLevel } from "@microsoft/signalr";
-import { getDesignRequestDetail, assignStaffToRequest, submitQuote, postDesignRequestMessage, cancelDesignRequest, uploadFile } from "../../api/mainflow2Api";
+import { Spin, message, Modal, Button, Select } from "antd";
+import { getDesignRequestDetail, assignStaffToRequest, managerAssignStaff, getMainflow2StaffList, submitQuote, postDesignRequestMessage, cancelDesignRequest, uploadFile, completeDesign, isDirectPrintSourceType } from "../../api/mainflow2Api";
 import { useAuth } from "../../contexts/AuthContext";
+import useMainflow2Realtime from "../../hooks/useMainflow2Realtime";
+import CustomerRequestPanel from "../../components/Mainflow2/CustomerRequestPanel";
+import StaffQuoteModal from "../../components/Mainflow2/StaffQuoteModal";
+import StaffDesignDeliverableModal from "../../components/Mainflow2/StaffDesignDeliverableModal";
+import QuoteMessageCard from "../../components/Mainflow2/QuoteMessageCard";
+import DesignDeliverableCard from "../../components/Mainflow2/DesignDeliverableCard";
+import ChatMessageBubble, { ChatComposer } from "../../components/Mainflow2/ChatMessageBubble";
+import { getMessageAuthorId } from "../../components/Mainflow2/messageMetadataUtils";
+import Model3DPreview from "../../components/Mainflow2/Model3DPreview";
 
 const CUSTOM_STATUS_STEPS = [
   { key: 'SUBMITTED', label: 'Gửi yêu cầu' },
   { key: 'ASSIGNED', label: 'Đã phân công' },
-  { key: 'QUOTED', label: 'Đã báo giá' },
+  { key: 'QUOTED', label: 'Báo giá thiết kế + in' },
   { key: 'NEGOTIATING', label: 'Thương lượng' },
   { key: 'APPROVED', label: 'Đã duyệt' },
 ];
@@ -18,7 +26,7 @@ const STATUS_ORDER = CUSTOM_STATUS_STEPS.map(s => s.key);
 const STATUS_LABEL = {
   SUBMITTED: 'Mới gửi',
   ASSIGNED: 'Đã nhận việc',
-  QUOTED: 'Đã báo giá',
+  QUOTED: 'Báo giá thiết kế + in',
   NEGOTIATING: 'Đang thương lượng',
   APPROVED: 'Đã duyệt',
   CANCELLED: 'Đã hủy',
@@ -36,6 +44,9 @@ const statusColor = (status) => {
   return { background: '#fef2f2', color: '#dc2626' };
 };
 
+const isDesignDeliverableLog = (logType) =>
+  String(logType || '').toUpperCase().includes('DESIGN_READY');
+
 const StaffCustomOrderDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -47,6 +58,7 @@ const StaffCustomOrderDetail = () => {
 
   // Chat
   const [chatMessage, setChatMessage] = useState("");
+  const [uploading, setUploading] = useState(false);
   const messagesContainerRef = useRef(null);
 
   useEffect(() => {
@@ -56,42 +68,28 @@ const StaffCustomOrderDetail = () => {
   }, [order?.messages]);
 
   // Quote panel
-  const [showQuotePanel, setShowQuotePanel] = useState(false);
-  const [quotePrice, setQuotePrice] = useState(0);
-  const [quoteNote, setQuoteNote] = useState("");
-  const [designFileUrl, setDesignFileUrl] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const glbFileInputRef = useRef(null);
+  const [quoteModalOpen, setQuoteModalOpen] = useState(false);
+  const [deliverableModalOpen, setDeliverableModalOpen] = useState(false);
+  const [staffList, setStaffList] = useState([]);
+  const [selectedStaffId, setSelectedStaffId] = useState(null);
+
+  const isManager = ['manager', 'admin'].includes(String(user?.role || '').toLowerCase());
 
   useEffect(() => {
-    fetchDetail();
+    if (!isManager) return;
+    (async () => {
+      try {
+        const res = await getMainflow2StaffList();
+        setStaffList(Array.isArray(res?.data) ? res.data : []);
+      } catch {
+        /* manager-only */
+      }
+    })();
+  }, [isManager]);
 
-    const token = localStorage.getItem('token');
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://103.90.227.51:8080/';
-    const hubUrl = `${baseUrl.replace(/\/$/, '')}/hubs/mainflow-2-design`;
-
-    const connection = new HubConnectionBuilder()
-      .withUrl(hubUrl, { accessTokenFactory: () => token })
-      .withAutomaticReconnect()
-      .configureLogging(LogLevel.Information)
-      .build();
-
-    connection.start()
-      .then(() => {
-        connection.invoke("JoinDesignWork", id).catch(console.error);
-        connection.on("Mainflow2Event", () => fetchDetail(true));
-      })
-      .catch(err => console.error("SignalR Error:", err));
-
-    return () => {
-      connection.invoke("LeaveDesignWork", id).catch(console.error);
-      connection.stop();
-    };
-  }, [id]);
-
-  const fetchDetail = async (silent = false) => {
+  const fetchDetail = useCallback(async (silent = false) => {
     try {
-      if (!silent && !order) setLoading(true);
+      if (!silent) setLoading(true);
       const res = await getDesignRequestDetail(id);
       if (res?.statusCode === 200) setOrder(res.data);
       else message.error(res?.message || 'Không tìm thấy chi tiết yêu cầu');
@@ -100,7 +98,13 @@ const StaffCustomOrderDetail = () => {
     } finally {
       if (!silent) setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    fetchDetail();
+  }, [id]);
+
+  useMainflow2Realtime(id, () => fetchDetail(true));
 
   const handleAssign = () => {
     Modal.confirm({
@@ -119,39 +123,93 @@ const StaffCustomOrderDetail = () => {
     });
   };
 
-  const handleSendChat = async () => {
-    if (!chatMessage.trim()) return;
-    try {
-      const res = await postDesignRequestMessage(id, { content: chatMessage, attachmentUrls: [] });
-      if (res?.statusCode === 200) { setChatMessage(""); fetchDetail(true); }
-      else message.error(res?.message || 'Lỗi gửi tin');
-    } catch { message.error("Lỗi khi gửi tin nhắn"); }
-  };
-
-  const handleSubmitQuote = async () => {
-    if (quotePrice <= 0) return message.warning("Giá báo phải lớn hơn 0");
-    if (!quoteNote.trim()) return message.warning("Vui lòng nhập ghi chú báo giá");
+  const handleManagerAssign = async () => {
+    if (!selectedStaffId) {
+      message.warning('Chọn nhân viên để giao việc');
+      return;
+    }
     try {
       setProcessing(true);
-      const res = await submitQuote(id, {
-        quotedPrice: quotePrice,
-        currency: "VND",
-        staffNote: quoteNote,
-        designFileUrls: designFileUrl ? [designFileUrl] : []
+      const res = await managerAssignStaff(id, selectedStaffId);
+      if (res?.statusCode === 200) {
+        message.success('Đã giao việc cho nhân viên!');
+        fetchDetail();
+      } else message.error(res?.message || 'Giao việc thất bại');
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Giao việc thất bại');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleSendChat = async ({ content, file }) => {
+    const text = content?.trim();
+    if (!text && !file) return;
+    try {
+      setUploading(true);
+      let attachmentUrls = [];
+      if (file) {
+        const up = await uploadFile(file);
+        const url = up?.data?.publicUrl || up?.data?.url || up?.publicUrl || up?.url;
+        if (!url) {
+          message.error('Upload file thất bại');
+          return;
+        }
+        attachmentUrls = [url];
+      }
+      const res = await postDesignRequestMessage(id, {
+        content: text || `[File: ${file?.name || 'đính kèm'}]`,
+        attachmentUrls,
       });
       if (res?.statusCode === 200) {
+        setChatMessage('');
+        fetchDetail(true);
+      } else message.error(res?.message || 'Lỗi gửi tin');
+    } catch {
+      message.error('Lỗi khi gửi tin nhắn');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSubmitQuote = async (payload) => {
+    try {
+      setProcessing(true);
+      const res = await submitQuote(id, payload);
+      if (res?.statusCode === 200) {
         message.success('Báo giá thành công!');
-        setShowQuotePanel(false);
-        setDesignFileUrl("");
-        setQuoteNote("");
-        setQuotePrice(0);
+        setQuoteModalOpen(false);
         fetchDetail();
       } else message.error(res?.message || 'Lỗi gửi báo giá');
-    } catch { message.error("Lỗi báo giá"); }
-    finally { setProcessing(false); }
+    } catch (err) {
+      message.error(err?.response?.data?.message || err?.response?.data?.data || 'Lỗi báo giá');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleSubmitDesignDeliverable = async ({ deliverableFileUrl, note }) => {
+    try {
+      setProcessing(true);
+      const res = await completeDesign(id, { deliverableFileUrl, note });
+      if (res?.statusCode === 200) {
+        message.success('Đã gửi bảng thiết kế!');
+        setDeliverableModalOpen(false);
+        fetchDetail();
+      } else message.error(res?.message || 'Thất bại');
+    } catch (err) {
+      message.error(err?.response?.data?.message || err?.response?.data?.data || 'Thất bại');
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const handleCancel = () => {
+    const designWorkId = order?.id || id;
+    if (!designWorkId) {
+      message.error('Thiếu mã yêu cầu — không thể hủy.');
+      return;
+    }
     Modal.confirm({
       title: 'Hủy yêu cầu',
       content: 'Hành động này không thể hoàn tác.',
@@ -161,7 +219,7 @@ const StaffCustomOrderDetail = () => {
       onOk: async () => {
         try {
           setProcessing(true);
-          const res = await cancelDesignRequest(id);
+          const res = await cancelDesignRequest(designWorkId);
           if (res?.statusCode === 200) { message.success('Đã hủy!'); fetchDetail(); }
           else message.error(res?.message || 'Lỗi khi hủy');
         } catch { message.error('Lỗi khi hủy'); }
@@ -177,6 +235,15 @@ const StaffCustomOrderDetail = () => {
       </div>
     );
   }
+
+  const fileVersions = order?.versions || order?.quoteFileVersions || [];
+  const isDirectPrintFlow = isDirectPrintSourceType(order?.sourceType);
+  const isPaid = order?.linkedPaymentStatus === 'PAID';
+  const isDeposited = order?.linkedPaymentStatus === 'PARTIALLY_PAID';
+  const designReady = Boolean(order?.designReadyForBalance);
+  const showDesigningPhase = !isDirectPrintFlow && isDeposited && !isPaid && !designReady;
+  const showAwaitingBalance = !isDirectPrintFlow && isDeposited && designReady && !isPaid;
+  const showProduction = isPaid;
 
   if (!order) {
     return (
@@ -221,74 +288,53 @@ const StaffCustomOrderDetail = () => {
           <div ref={messagesContainerRef}
             style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
+            {(order.requirementBrief || order.initialIdeaImageUrls?.length || order.customerFileUrl) && (
+              <div
+                style={{
+                  flexShrink: 0,
+                  padding: '14px 16px',
+                  background: '#fffbeb',
+                  border: '1px solid #fde68a',
+                  borderRadius: 12,
+                  marginBottom: 4,
+                }}
+              >
+                <p style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 700, color: '#b45309', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  Yêu cầu & hình tham khảo từ khách
+                </p>
+                <CustomerRequestPanel order={order} />
+              </div>
+            )}
+
             {/* Messages + inline quotes */}
             {order.messages?.length > 0 ? order.messages.map((msg, i) => {
-              const isMe = msg.authorAccountId === user?.id;
+              const isMe = getMessageAuthorId(msg) === user?.id;
               const isQuote = msg.logType && msg.logType.toUpperCase().includes('QUOTE');
+              const isDesignDeliverable = isDesignDeliverableLog(msg.logType);
 
               if (isQuote) {
                 let meta = null;
                 try { meta = msg.metadataJson ? JSON.parse(msg.metadataJson) : null; } catch { }
                 return (
-                  <div key={i} style={{ alignSelf: msg.authorAccountId === user?.id ? 'flex-end' : 'flex-start', width: '100%', marginBottom: 12 }}>
-                    <div style={{ background: '#ecfdf5', border: '1px solid #6ee7b7', borderRadius: '16px 16px 16px 4px', padding: '12px 16px' }}>
-                      <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: 1 }}>
-                        💰 Báo giá{meta?.revisionNumber ? ` rev ${meta.revisionNumber}` : ''}
-                      </p>
-                      {meta?.quotedPrice != null && (
-                        <p style={{ margin: '0 0 6px', fontSize: 22, fontWeight: 800, color: '#065f46' }}>
-                          {formatPrice(meta.quotedPrice)}
-                        </p>
-                      )}
-                      {/* {msg.content && <p style={{ margin: '0 0 6px', fontSize: 13, color: '#374151' }}>{msg.content}</p>} */}
-                      {meta?.designFileUrls?.filter(u => u && u.trim() !== "").length > 0 && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12, padding: '12px', background: 'rgba(255,255,255,0.9)', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)' }}>
-                          {[...new Set(meta.designFileUrls.filter(u => u && u.trim() !== ""))].slice(1).map((url, fi) => {
-                            const lowUrl = url.toLowerCase();
-                            const isGLB = lowUrl.endsWith('.glb');
-                            const isImage = lowUrl.endsWith('.png') || lowUrl.endsWith('.jpg') || lowUrl.endsWith('.jpeg') || lowUrl.endsWith('.webp');
+                  <div key={msg.id || i} style={{ width: '100%', marginBottom: 12 }}>
+                    <QuoteMessageCard
+                      meta={meta}
+                      staffNote={msg.content}
+                      revision={meta?.revision}
+                    />
+                    <span style={{ fontSize: 10, color: '#9ca3af', marginTop: 3, display: 'block' }}>
+                      {new Date(msg.created).toLocaleString('vi-VN')} · Nhân viên
+                    </span>
+                  </div>
+                );
+              }
 
-                            if (isGLB) {
-                              return (
-                                <div key={fi} style={{ position: 'relative' }}>
-                                  <div style={{ width: '100%', height: 260, borderRadius: 8, overflow: 'hidden', background: 'linear-gradient(to bottom, #f8fafc, #f1f5f9)', border: '1px solid #e2e8f0' }}>
-                                    <model-viewer
-                                      src={url}
-                                      camera-controls
-                                      auto-rotate
-                                      shadow-intensity="1"
-                                      environment-image="neutral"
-                                      exposure="1"
-                                      style={{ width: '100%', height: '100%' }}
-                                    />
-                                  </div>
-                                  <a href={url} target="_blank" rel="noreferrer"
-                                    style={{ position: 'absolute', bottom: 8, right: 8, background: 'rgba(255,255,255,0.9)', padding: '5px 10px', borderRadius: 6, fontSize: 11, color: '#475569', textDecoration: 'none', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
-                                    <span>💾</span> Tải về GLB
-                                  </a>
-                                </div>
-                              );
-                            }
-
-                            if (isImage) {
-                              return (
-                                <a key={fi} href={url} target="_blank" rel="noreferrer" style={{ display: 'block', borderRadius: 8, overflow: 'hidden', border: '1px solid #e2e8f0' }}>
-                                  <img src={url} alt="" style={{ width: '100%', maxHeight: 300, objectFit: 'contain', display: 'block', background: '#f8fafc' }} />
-                                </a>
-                              );
-                            }
-
-                            return (
-                              <a key={fi} href={url} target="_blank" rel="noreferrer"
-                                style={{ fontSize: 13, color: '#2563eb', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: '#fff', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-                                <span style={{ fontSize: 18 }}>📎</span>
-                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500, maxWidth: 260 }}>{url.split('/').pop()}</span>
-                              </a>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
+              if (isDesignDeliverable) {
+                let meta = null;
+                try { meta = msg.metadataJson ? JSON.parse(msg.metadataJson) : null; } catch { }
+                return (
+                  <div key={msg.id || i} style={{ width: '100%', marginBottom: 12 }}>
+                    <DesignDeliverableCard meta={meta} staffNote={msg.content} />
                     <span style={{ fontSize: 10, color: '#9ca3af', marginTop: 3, display: 'block' }}>
                       {new Date(msg.created).toLocaleString('vi-VN')} · Nhân viên
                     </span>
@@ -297,123 +343,111 @@ const StaffCustomOrderDetail = () => {
               }
 
               return (
-                <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
-                  <div style={{
-                    padding: '8px 14px',
-                    borderRadius: isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-                    maxWidth: '70%', fontSize: 14, lineHeight: 1.5, wordBreak: 'break-word',
-                    background: isMe ? '#4f46e5' : '#fff',
-                    color: isMe ? '#fff' : '#1f2937',
-                    border: isMe ? 'none' : '1px solid #e5e7eb',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-                  }}>
-                    {msg.content}
-                  </div>
-                  <span style={{ fontSize: 10, color: '#9ca3af', marginTop: 3 }}>
-                    {new Date(msg.created).toLocaleString('vi-VN')} · {isMe ? 'Tôi' : 'Khách'}
-                  </span>
-                </div>
+                <ChatMessageBubble
+                  key={msg.id || i}
+                  msg={msg}
+                  isMe={isMe}
+                  otherLabel="Khách"
+                />
               );
             }) : (
               <div style={{ textAlign: 'center', color: '#9ca3af', fontSize: 13, marginTop: 40 }}>Chưa có tin nhắn nào. Hãy bắt đầu trao đổi!</div>
             )}
           </div>
 
-          {/* Quote panel (inline above composer) */}
-          {showQuotePanel && (
-            <div style={{ flexShrink: 0, background: '#f8fafc', borderTop: '1px solid #e5e7eb', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: '#065f46' }}>💰 Tạo báo giá mới</p>
-                <button onClick={() => setShowQuotePanel(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 18, padding: 0 }}>×</button>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Mức giá (VND)</label>
-                  <InputNumber
-                    style={{ width: '100%' }}
-                    min={0} step={10000}
-                    value={quotePrice}
-                    onChange={v => setQuotePrice(v)}
-                    formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                    parser={v => v?.replace(/\$\s?|(\.*)/g, '')}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>File 3D (GLB/OBJ/STL)</label>
-                  <input ref={glbFileInputRef} type="file" accept=".glb,.obj,.stl" style={{ display: 'none' }}
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      try {
-                        setUploading(true);
-                        const res = await uploadFile(file);
-                        if (res?.data?.publicUrl) { setDesignFileUrl(res.data.publicUrl); message.success('Upload thành công!'); }
-                        else message.error('Upload thất bại');
-                      } catch { message.error('Lỗi upload file'); }
-                      finally { setUploading(false); }
-                    }}
-                  />
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                    <Button size="small" loading={uploading} onClick={() => glbFileInputRef.current?.click()}>
-                      📂 {uploading ? 'Đang upload...' : 'Chọn file'}
-                    </Button>
-                    {designFileUrl
-                      ? <span style={{ fontSize: 11, color: '#059669', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>✓ {designFileUrl.split('/').pop()}</span>
-                      : <span style={{ fontSize: 11, color: '#9ca3af' }}>Chưa chọn</span>
-                    }
-                  </div>
-                </div>
-              </div>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Ghi chú báo giá</label>
-                <Input.TextArea rows={2} value={quoteNote} onChange={e => setQuoteNote(e.target.value)} placeholder="Mô tả nội dung, cam kết..." />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                <Button onClick={() => setShowQuotePanel(false)}>Hủy</Button>
-                <Button type="primary" style={{ background: '#059669' }} onClick={handleSubmitQuote} loading={processing}>Gửi báo giá</Button>
-              </div>
-            </div>
-          )}
-
           {/* Composer */}
-          <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', display: 'flex', alignItems: 'flex-end', gap: 8 }}>
-            {order.status === 'SUBMITTED' ? (
-              <div style={{ flex: 1, textAlign: 'center' }}>
-                <p style={{ margin: '0 0 8px 0', color: '#6b7280', fontSize: 13 }}>Bạn chưa nhận việc. Tiếp nhận để bắt đầu trao đổi.</p>
-                <Button type="primary" style={{ background: '#4f46e5' }} onClick={handleAssign} loading={processing}>Tiếp nhận xử lý</Button>
+          {order.status === 'SUBMITTED' ? (
+            <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center' }}>
+              {isManager ? (
+                <>
+                  <p style={{ margin: '0 0 8px 0', color: '#6b7280', fontSize: 13 }}>Manager giao việc cho nhân viên</p>
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <Select
+                      placeholder="Chọn nhân viên"
+                      style={{ minWidth: 220, textAlign: 'left' }}
+                      value={selectedStaffId}
+                      onChange={setSelectedStaffId}
+                      options={staffList.map((s) => ({ value: s.staffId, label: s.fullName || s.username }))}
+                    />
+                    <Button type="primary" style={{ background: '#4f46e5' }} onClick={handleManagerAssign} loading={processing}>
+                      Giao việc
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p style={{ margin: '0 0 8px 0', color: '#6b7280', fontSize: 13 }}>Bạn chưa nhận việc. Tiếp nhận để bắt đầu trao đổi.</p>
+                  <Button type="primary" style={{ background: '#4f46e5' }} onClick={handleAssign} loading={processing}>Tiếp nhận xử lý</Button>
+                </>
+              )}
+            </div>
+          ) : order.status === 'CANCELLED' ? (
+            <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center', color: '#dc2626', fontSize: 13, fontWeight: 500 }}>
+              Yêu cầu đã bị hủy.
+            </div>
+          ) : order.status === 'APPROVED' && showProduction ? (
+            <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center', color: '#2563eb', fontSize: 13, fontWeight: 600 }}>
+              Khách đã thanh toán đủ — theo dõi sản xuất tại hàng đợi in
+            </div>
+          ) : order.status === 'APPROVED' && showAwaitingBalance ? (
+            <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center', color: '#d97706', fontSize: 13, fontWeight: 600 }}>
+              Đã gửi bảng thiết kế — chờ khách hoàn tất thanh toán
+            </div>
+          ) : order.status === 'APPROVED' && showDesigningPhase ? (
+            <>
+              <div style={{ flexShrink: 0, background: '#faf5ff', borderTop: '1px solid #e9d5ff', padding: '10px 16px', textAlign: 'center', color: '#7c3aed', fontSize: 13, fontWeight: 600 }}>
+                Khách đã cọc 30% — gửi bảng thiết kế (GLB) cho khách duyệt
               </div>
-            ) : order.status === 'CANCELLED' ? (
-              <div style={{ flex: 1, textAlign: 'center', color: '#dc2626', fontSize: 13, fontWeight: 500 }}>Yêu cầu đã bị hủy.</div>
-            ) : order.status === 'APPROVED' ? (
-              <div style={{ flex: 1, textAlign: 'center', color: '#059669', fontSize: 13, fontWeight: 600 }}>🎉 Khách đã duyệt! Giá cuối: {formatPrice(order.latestQuotedPrice)}</div>
-            ) : (
-              <>
-                {['ASSIGNED', 'QUOTED', 'NEGOTIATING'].includes(order.status) && (
-                  <Button onClick={() => setShowQuotePanel(v => !v)}
-                    style={{ flexShrink: 0, background: showQuotePanel ? '#059669' : '#ecfdf5', borderColor: '#6ee7b7', color: showQuotePanel ? '#fff' : '#059669', fontWeight: 600 }}>
-                    💰 Báo giá
+              <ChatComposer
+                value={chatMessage}
+                onChange={setChatMessage}
+                onSend={handleSendChat}
+                uploading={uploading}
+                extraLeft={
+                  <Button
+                    type="primary"
+                    loading={processing}
+                    onClick={() => setDeliverableModalOpen(true)}
+                    style={{ flexShrink: 0, background: '#7c3aed', borderColor: '#7c3aed', fontWeight: 600 }}
+                  >
+                    Gửi bảng thiết kế
                   </Button>
-                )}
-                <Input.TextArea
-                  autoSize={{ minRows: 1, maxRows: 4 }}
-                  value={chatMessage}
-                  onChange={e => setChatMessage(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendChat(); } }}
-                  placeholder="Nhập tin nhắn... (Enter để gửi, Shift+Enter xuống dòng)"
-                  style={{ flex: 1, resize: 'none', borderRadius: 12, fontSize: 14 }}
-                />
-                <Button type="primary"
-                  style={{ background: '#4f46e5', flexShrink: 0, height: 36, borderRadius: 12 }}
-                  disabled={!chatMessage.trim()} onClick={handleSendChat}>
-                  Gửi →
-                </Button>
-              </>
-            )}
-          </div>
+                }
+              />
+            </>
+          ) : order.status === 'APPROVED' ? (
+            <div style={{ flexShrink: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', textAlign: 'center', color: '#059669', fontSize: 13, fontWeight: 600 }}>
+              🎉 Khách đã duyệt! Giá cuối: {formatPrice(order.latestQuotedPrice)}
+            </div>
+          ) : (
+            <ChatComposer
+              value={chatMessage}
+              onChange={setChatMessage}
+              onSend={handleSendChat}
+              uploading={uploading}
+              extraLeft={
+                ['ASSIGNED', 'QUOTED', 'NEGOTIATING'].includes(order.status) ? (
+                  <Button
+                    onClick={() => setQuoteModalOpen(true)}
+                    style={{ flexShrink: 0, background: '#ecfdf5', borderColor: '#6ee7b7', color: '#059669', fontWeight: 600 }}
+                  >
+                    💰 Báo giá thiết kế + in
+                  </Button>
+                ) : null
+              }
+            />
+          )}
         </div>
 
         {/* RIGHT SIDEBAR */}
-        <div style={{ width: 260, flexShrink: 0, overflowY: 'auto', background: '#fff', borderLeft: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ width: 300, flexShrink: 0, overflowY: 'auto', background: '#fff', borderLeft: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column' }}>
+
+          <div style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
+            <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>
+              Yêu cầu khách
+            </p>
+            <CustomerRequestPanel order={order} compact />
+          </div>
 
           {/* Timeline */}
           <div style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
@@ -462,20 +496,28 @@ const StaffCustomOrderDetail = () => {
             </div>
           )}
 
-          {/* File versions */}
-          {order.quoteFileVersions?.length > 0 && (
+          {/* 3D preview */}
+          {(order.latestQuotePreviewUrl || order.customerFileUrl) && (
             <div style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
-              <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>File đính kèm</p>
+              <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>
+                Xem trước 3D
+              </p>
+              <Model3DPreview fileUrl={order.latestQuotePreviewUrl || order.customerFileUrl} height={160} />
+            </div>
+          )}
+
+          {/* File versions */}
+          {fileVersions.length > 0 && (
+            <div style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
+              <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>Bản thiết kế (NV)</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {order.quoteFileVersions.map((f, i) => (
-                  <a key={i} href={f.fileUrl || f.url} target="_blank" rel="noreferrer"
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#f0f4ff', borderRadius: 8, textDecoration: 'none', border: '1px solid #e0e7ff' }}>
-                    <span style={{ fontSize: 18 }}>📦</span>
-                    <div style={{ minWidth: 0 }}>
-                      <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#3730a3', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.title || `File v${f.versionNumber}`}</p>
-                      <p style={{ margin: 0, fontSize: 10, color: '#6b7280' }}>Phiên bản {f.versionNumber}</p>
-                    </div>
-                  </a>
+                {fileVersions.map((f, i) => (
+                  <div key={i}>
+                    <Model3DPreview fileUrl={f.fileUrl || f.url} height={120} />
+                    <p style={{ margin: '4px 0 0', fontSize: 10, color: '#6b7280' }}>
+                      {f.title || `File v${f.versionNumber}`} · v{f.versionNumber}
+                    </p>
+                  </div>
                 ))}
               </div>
             </div>
@@ -484,10 +526,28 @@ const StaffCustomOrderDetail = () => {
           {/* Customer info */}
           <div style={{ padding: '16px' }}>
             <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>Khách hàng</p>
-            <p style={{ margin: 0, fontSize: 11, fontFamily: 'monospace', color: '#374151', wordBreak: 'break-all' }}>{order.customerId}</p>
+            {order.customerName && (
+              <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 600, color: '#111827' }}>{order.customerName}</p>
+            )}
+            <p style={{ margin: 0, fontSize: 10, fontFamily: 'monospace', color: '#9ca3af', wordBreak: 'break-all' }}>{order.customerId}</p>
           </div>
         </div>
       </div>
+
+      <StaffQuoteModal
+        open={quoteModalOpen}
+        onClose={() => setQuoteModalOpen(false)}
+        onSubmit={handleSubmitQuote}
+        submitting={processing}
+        designWorkTitle={order.title}
+      />
+
+      <StaffDesignDeliverableModal
+        open={deliverableModalOpen}
+        onClose={() => setDeliverableModalOpen(false)}
+        onSubmit={handleSubmitDesignDeliverable}
+        submitting={processing}
+      />
     </div>
   );
 };

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Descriptions, Tag, Button, Spin, App, Timeline, Table, Popconfirm, Divider } from 'antd';
 import { ArrowLeftOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { getOrderDetailApi, cancelOrderApi } from '../../api/orderApi';
+import StaffCarrierActions from '../../components/Shipping/StaffCarrierActions';
 
 const statusColorMap = {
   PENDING: 'gold',
@@ -175,6 +176,14 @@ const AdminOrderDetail = () => {
           rowKey="id"
           pagination={false}
           size="small"
+        />
+      </Card>
+
+      <Card title="Vận chuyển GHN" className="mt-6 shadow-sm rounded-lg border-0">
+        <StaffCarrierActions
+          orderId={id}
+          orderStatus={order.status || order.orderStatus}
+          onUpdated={fetchOrderDetail}
         />
       </Card>
 
