@@ -4,9 +4,10 @@ import { App, Card, Input, Button, Form } from 'antd';
 import { LockOutlined, UserOutlined } from '@ant-design/icons';
 // Đảm bảo đường dẫn này trỏ đúng vào file AuthContext của bạn
 import { useAuth } from '../../contexts/AuthContext';
+import { getPostLoginPath } from '../../utils/authRedirect';
 
 const AdminLoginPage = () => {
-    const { systemLogin } = useAuth(); // Gọi hàm systemLogin chuyên biệt dành cho Admin
+    const { login, systemLogin } = useAuth();
     const navigate = useNavigate();
     const { message } = App.useApp(); // Dùng chuẩn Antd v5 để không báo lỗi vàng
     const [loading, setLoading] = useState(false);
@@ -15,21 +16,15 @@ const AdminLoginPage = () => {
     const onFinish = async (values) => {
         setLoading(true);
 
-        // Ant Design tự gom username và password vào object 'values'
-        const result = await systemLogin(values.username, values.password);
+        // Admin portal: ưu tiên system-login (admin config + manager/staff DB)
+        let result = await systemLogin(values.username.trim(), values.password);
+        if (!result.success) {
+            result = await login(values.username.trim(), values.password);
+        }
 
         if (result.success) {
-            message.success('Chào mừng Quản trị viên quay trở lại!');
-
-            // Phân luồng điều hướng dựa trên Role của nhân viên
-            const role = result.user?.role?.toLowerCase();
-            if (role === 'manager') {
-                navigate('/manager/dashboard');
-            } else if (['employee', 'staff'].includes(role)) {
-                navigate('/staff/dashboard');
-            } else {
-                navigate('/admin'); // Mặc định cho Admin
-            }
+            message.success('Đăng nhập thành công!');
+            navigate(getPostLoginPath(result.user?.role));
         } else {
             message.error(result.message);
         }
@@ -47,8 +42,13 @@ const AdminLoginPage = () => {
                         SYSTEM PORTAL
                     </h2>
                     <p className="text-gray-500 mt-2 text-sm font-medium">
-                        Khu vực đăng nhập dành cho nhân viên
+                        Khu vực đăng nhập dành cho Admin / Manager / Staff
                     </p>
+                    {import.meta.env.DEV && (
+                        <p className="text-xs text-gray-400 mt-3 mb-0">
+                            Dev: admin / Admin@123 · manager01 / Pass@123
+                        </p>
+                    )}
                 </div>
 
                 {/* Form của Ant Design tự lo việc quản lý State và Validate */}
